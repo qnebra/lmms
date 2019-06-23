@@ -45,14 +45,15 @@ float frnd(float range)
 #include "Knob.h"
 #include "NotePlayHandle.h"
 #include "PixmapButton.h"
-#include "templates.h"
 #include "ToolTip.h"
 #include "Song.h"
 #include "MidiEvent.h"
 #include "MidiTime.h"
 #include "Mixer.h"
 
-#include "embed.cpp"
+#include "embed.h"
+
+#include "plugin_export.h"
 
 extern "C"
 {
@@ -353,7 +354,7 @@ sfxrInstrument::sfxrInstrument( InstrumentTrack * _instrument_track ) :
 	m_lpFilResoModel(0.0f, this, "LP Filter Resonance"),
 	m_hpFilCutModel(0.0f, this, "HP Filter Cutoff"),
 	m_hpFilCutSweepModel(0.0f, this, "HP Filter Cutoff Sweep"),
-	m_waveFormModel( SQR_WAVE, 0, WAVES_NUM-1, this, tr( "Wave Form" ) )
+	m_waveFormModel( SQR_WAVE, 0, WAVES_NUM-1, this, tr( "Wave" ) )
 {
 }
 
@@ -1120,9 +1121,9 @@ extern "C"
 {
 
 // necessary for getting instance out of shared lib
-Plugin * PLUGIN_EXPORT lmms_plugin_main( Model*, void* data )
+PLUGIN_EXPORT Plugin * lmms_plugin_main( Model* m, void* )
 {
-	return new sfxrInstrument( static_cast<InstrumentTrack *>( data ) );
+	return new sfxrInstrument( static_cast<InstrumentTrack *>( m ) );
 }
 
 

@@ -47,6 +47,7 @@
 #include "Mixer.h"
 #include "gui_templates.h"
 #include "InstrumentTrack.h"
+#include "SampleTrack.h"
 #include "Song.h"
 #include "BBTrackContainer.h"
 
@@ -131,7 +132,7 @@ FxMixerView::FxMixerView() :
 	ml->addWidget( channelArea, 1, Qt::AlignTop );
 
 	// show the add new effect channel button
-	QPushButton * newChannelBtn = new QPushButton( embed::getIconPixmap( "new_channel" ), QString::null, this );
+	QPushButton * newChannelBtn = new QPushButton( embed::getIconPixmap( "new_channel" ), QString(), this );
 	newChannelBtn->setObjectName( "newChannelBtn" );
 	newChannelBtn->setFixedSize( fxLineSize );
 	connect( newChannelBtn, SIGNAL( clicked() ), this, SLOT( addNewChannel() ) );
@@ -249,6 +250,12 @@ void FxMixerView::updateMaxChannelSelector()
 			{
 				InstrumentTrack * inst = (InstrumentTrack *) trackList[i];
 				inst->effectChannelModel()->setRange(0,
+					m_fxChannelViews.size()-1,1);
+			}
+			else if( trackList[i]->type() == Track::SampleTrack )
+			{
+				SampleTrack * strk = (SampleTrack *) trackList[i];
+				strk->effectChannelModel()->setRange(0,
 					m_fxChannelViews.size()-1,1);
 			}
 		}
@@ -493,6 +500,12 @@ void FxMixerView::moveChannelRight(int index)
 }
 
 
+void FxMixerView::renameChannel(int index)
+{
+	m_fxChannelViews[index]->m_fxLine->renameChannel();
+}
+
+
 
 void FxMixerView::keyPressEvent(QKeyEvent * e)
 {
@@ -528,6 +541,11 @@ void FxMixerView::keyPressEvent(QKeyEvent * e)
 			{
 				addNewChannel();
 			}
+			break;
+		case Qt::Key_Enter:
+		case Qt::Key_Return:
+		case Qt::Key_F2:
+			renameChannel( m_currentFxLine->channelIndex() );
 			break;
 	}
 }
@@ -581,23 +599,25 @@ void FxMixerView::updateFaders()
 	{
 		const float opl = m_fxChannelViews[i]->m_fader->getPeak_L();
 		const float opr = m_fxChannelViews[i]->m_fader->getPeak_R();
-		const float fallOff = 1.07;
-		if( m->effectChannel(i)->m_peakLeft > opl )
+		const float fallOff = 1.25;
+		if( m->effectChannel(i)->m_peakLeft >= opl/fallOff )
 		{
 			m_fxChannelViews[i]->m_fader->setPeak_L( m->effectChannel(i)->m_peakLeft );
-			m->effectChannel(i)->m_peakLeft = 0;
+			// Set to -1 so later we'll know if this value has been refreshed yet.
+			m->effectChannel(i)->m_peakLeft = -1;
 		}
-		else
+		else if( m->effectChannel(i)->m_peakLeft != -1 )
 		{
 			m_fxChannelViews[i]->m_fader->setPeak_L( opl/fallOff );
 		}
 
-		if( m->effectChannel(i)->m_peakRight > opr )
+		if( m->effectChannel(i)->m_peakRight >= opr/fallOff )
 		{
 			m_fxChannelViews[i]->m_fader->setPeak_R( m->effectChannel(i)->m_peakRight );
-			m->effectChannel(i)->m_peakRight = 0;
+			// Set to -1 so later we'll know if this value has been refreshed yet.
+			m->effectChannel(i)->m_peakRight = -1;
 		}
-		else
+		else if( m->effectChannel(i)->m_peakRight != -1 )
 		{
 			m_fxChannelViews[i]->m_fader->setPeak_R( opr/fallOff );
 		}

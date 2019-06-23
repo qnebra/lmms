@@ -59,34 +59,8 @@
 #include "FileDialog.h"
 
 
-SampleBuffer::SampleBuffer( const QString & _audio_file,
-							bool _is_base64_data ) :
-	m_audioFile( ( _is_base64_data == true ) ? "" : _audio_file ),
-	m_origData( NULL ),
-	m_origFrames( 0 ),
-	m_data( NULL ),
-	m_frames( 0 ),
-	m_startFrame( 0 ),
-	m_endFrame( 0 ),
-	m_loopStartFrame( 0 ),
-	m_loopEndFrame( 0 ),
-	m_amplification( 1.0f ),
-	m_reversed( false ),
-	m_frequency( BaseFreq ),
-	m_sampleRate( mixerSampleRate () )
-{
-	if( _is_base64_data == true )
-	{
-		loadFromBase64( _audio_file );
-	}
-	connect( Engine::mixer(), SIGNAL( sampleRateChanged() ), this, SLOT( sampleRateChanged() ) );
-	update();
-}
 
-
-
-
-SampleBuffer::SampleBuffer( const sampleFrame * _data, const f_cnt_t _frames ) :
+SampleBuffer::SampleBuffer() :
 	m_audioFile( "" ),
 	m_origData( NULL ),
 	m_origFrames( 0 ),
@@ -100,43 +74,57 @@ SampleBuffer::SampleBuffer( const sampleFrame * _data, const f_cnt_t _frames ) :
 	m_reversed( false ),
 	m_frequency( BaseFreq ),
 	m_sampleRate( mixerSampleRate () )
+{
+
+	connect( Engine::mixer(), SIGNAL( sampleRateChanged() ), this, SLOT( sampleRateChanged() ) );
+	update();
+}
+
+
+
+SampleBuffer::SampleBuffer( const QString & _audio_file,
+							bool _is_base64_data )
+	: SampleBuffer()
+{
+	if( _is_base64_data )
+	{
+		loadFromBase64( _audio_file );
+	}
+	else
+	{
+		m_audioFile = _audio_file;
+		update();
+	}
+}
+
+
+
+
+SampleBuffer::SampleBuffer( const sampleFrame * _data, const f_cnt_t _frames )
+	: SampleBuffer()
 {
 	if( _frames > 0 )
 	{
 		m_origData = MM_ALLOC( sampleFrame, _frames );
 		memcpy( m_origData, _data, _frames * BYTES_PER_FRAME );
 		m_origFrames = _frames;
+		update();
 	}
-	connect( Engine::mixer(), SIGNAL( sampleRateChanged() ), this, SLOT( sampleRateChanged() ) );
-	update();
 }
 
 
 
 
-SampleBuffer::SampleBuffer( const f_cnt_t _frames ) :
-	m_audioFile( "" ),
-	m_origData( NULL ),
-	m_origFrames( 0 ),
-	m_data( NULL ),
-	m_frames( 0 ),
-	m_startFrame( 0 ),
-	m_endFrame( 0 ),
-	m_loopStartFrame( 0 ),
-	m_loopEndFrame( 0 ),
-	m_amplification( 1.0f ),
-	m_reversed( false ),
-	m_frequency( BaseFreq ),
-	m_sampleRate( mixerSampleRate () )
+SampleBuffer::SampleBuffer( const f_cnt_t _frames )
+	: SampleBuffer()
 {
 	if( _frames > 0 )
 	{
 		m_origData = MM_ALLOC( sampleFrame, _frames );
 		memset( m_origData, 0, _frames * BYTES_PER_FRAME );
 		m_origFrames = _frames;
+		update();
 	}
-	connect( Engine::mixer(), SIGNAL( sampleRateChanged() ), this, SLOT( sampleRateChanged() ) );
-	update();
 }
 
 
@@ -948,7 +936,7 @@ void SampleBuffer::visualize( QPainter & _p, const QRect & _dr,
 	const float y_space = h*0.5f;
 	const int nb_frames = focus_on_range ? _to_frame - _from_frame : m_frames;
 
-	const int fpp = tLimit<int>( nb_frames / w, 1, 20 );
+	const int fpp = qBound<int>( 1, nb_frames / w, 20 );
 	QPointF * l = new QPointF[nb_frames / fpp + 1];
 	QPointF * r = new QPointF[nb_frames / fpp + 1];
 	int n = 0;
@@ -1028,12 +1016,12 @@ QString SampleBuffer::openAudioFile() const
 	{
 		if( ofd.selectedFiles().isEmpty() )
 		{
-			return QString::null;
+			return QString();
 		}
 		return tryToMakeRelative( ofd.selectedFiles()[0] );
 	}
 
-	return QString::null;
+	return QString();
 }
 
 
