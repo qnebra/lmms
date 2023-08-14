@@ -4138,8 +4138,15 @@ void PianoRoll::finishRecordNote(const Note & n )
 					Note n1( n.length(), it->pos(),
 							it->key(), it->getVolume(),
 							it->getPanning() );
-					n1.quantizeLength( quantization() );
-					m_midiClip->addNote( n1 );
+
+					// TODO this value is probably better off cached somewhere;
+					//  currently doing a string parse everytime a note is released.
+					bool doQuantize = (ConfigManager::inst()->value("midi", "autoquantize").toInt() != 0);
+					if (doQuantize) {
+						n1.quantizeLength(quantization());
+						n1.quantizePos(quantization());
+					}
+					m_midiClip->addNote(n1,false);
 					update();
 					m_recordingNotes.erase( it );
 					break;
