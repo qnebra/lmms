@@ -9,6 +9,7 @@ QLabel, QTreeWidget, QListWidget, QGroupBox, QMenuBar {
 
 QTreeView {
 	outline: none;
+	font-size: 12px;
 }
 
 QTreeWidget::item {
@@ -41,7 +42,7 @@ QMdiArea {
 
 lmms--gui--FileBrowser QCheckBox
 {
-	font-size: 8pt;
+	font-size: 10px;
 	color: white;
 }
 
