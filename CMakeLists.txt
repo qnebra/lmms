@@ -80,7 +80,7 @@ OPTION(WANT_WINMM	"Include WinMM MIDI support" OFF)
 OPTION(WANT_DEBUG_FPE	"Debug floating point exceptions" OFF)
 option(WANT_DEBUG_ASAN	"Enable AddressSanitizer" ON)
 option(WANT_DEBUG_TSAN	"Enable ThreadSanitizer" OFF)
-option(WANT_DEBUG_MSAN	"Enable MemorySanitizer" OFF)
+option(WANT_DEBUG_MSAN	"Enable MemorySanitizer" ON)
 OPTION(BUNDLE_QT_TRANSLATIONS	"Install Qt translation files for LMMS" OFF)
 
 
