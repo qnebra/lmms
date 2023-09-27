@@ -66,9 +66,9 @@ protected:
 
 
 private:
-	static QPixmap* s_background;
-	static QPixmap* s_arrow;
-	static QPixmap* s_arrowSelected;
+	QPixmap* m_background;
+	QPixmap* m_arrow;
+	QPixmap* m_arrowSelected;
 
 	QMenu m_menu;
 

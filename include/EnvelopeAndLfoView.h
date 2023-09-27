@@ -71,8 +71,8 @@ protected slots:
 
 
 private:
-	static QPixmap * s_envGraph;
-	static QPixmap * s_lfoGraph;
+	QPixmap* m_envGraph;
+	QPixmap* m_lfoGraph;
 
 	EnvelopeAndLfoParameters * m_params;
 

@@ -170,12 +170,12 @@ private:
 	AutomationEditor( const AutomationEditor & );
 	~AutomationEditor() override;
 
-	static QPixmap * s_toolDraw;
-	static QPixmap * s_toolErase;
-	static QPixmap * s_toolDrawOut;
-	static QPixmap * s_toolMove;
-	static QPixmap * s_toolYFlip;
-	static QPixmap * s_toolXFlip;
+	QPixmap* m_toolDraw;
+	QPixmap* m_toolErase;
+	QPixmap* m_toolDrawOut;
+	QPixmap* m_toolMove;
+	QPixmap* m_toolYFlip;
+	QPixmap* m_toolXFlip;
 
 	ComboBoxModel m_zoomingXModel;
 	ComboBoxModel m_zoomingYModel;
