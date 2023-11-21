@@ -33,7 +33,7 @@ namespace lmms
 MeterModel::MeterModel( Model * _parent ) :
 	Model( _parent ),
 	m_numeratorModel( 4, 1, 32, this, tr( "Numerator" ) ),
-	m_denominatorModel(4, 1, 32, this, tr("Denominator"), false, true)
+	m_denominatorModel(4, 1, 32, this, tr("Denominator") ),
 {
 	connect( &m_numeratorModel, SIGNAL(dataChanged()), 
 			this, SIGNAL(dataChanged()), Qt::DirectConnection );
@@ -69,9 +69,9 @@ void MeterModel::loadSettings( const QDomElement & _this,
 {
 // Reset the denominator model to only accept powers of two and then
 // if it encounters a non-base2 denominator, it will disable this itself
-	m_denominatorModel.setRestrictToTwoPowers(true);
 	m_numeratorModel.loadSettings( _this, _name + "_numerator" );
 	m_denominatorModel.loadSettings( _this, _name + "_denominator" );
+	m_denominatorModel.setRestrictToTwoPowers(true);
 }
 
 
