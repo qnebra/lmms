@@ -25,6 +25,7 @@
 
 #include "MidiClipView.h"
 
+
 #include <algorithm>
 #include <cmath>
 #include <QApplication>
