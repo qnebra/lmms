@@ -73,6 +73,7 @@ public:
 	ComboBoxModel *snappingModel() const;
 	float getSnapSize() const;
 	QString getSnapSizeString() const;
+	void scrollToStart();
 
 public slots:
 	void scrolled( int new_pos );
@@ -191,6 +192,7 @@ protected slots:
 	void record() override;
 	void recordAccompany() override;
 	void stop() override;
+	void stopAndGoBack() override;
 
 	void lostFocus();
 	void adjustUiAfterProjectLoad();

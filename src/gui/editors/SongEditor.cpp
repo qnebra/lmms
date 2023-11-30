@@ -833,6 +833,12 @@ void SongEditor::updatePositionLine()
 
 
 
+void SongEditor::scrollToStart()
+{
+	 m_leftRightScroll->setValue(0);
+}
+
+
 
 //! Convert zoom slider's value to bar width in pixels
 int SongEditor::calculatePixelsPerBar() const
@@ -1138,7 +1144,11 @@ void SongEditorWindow::stop()
 }
 
 
-
+void SongEditorWindow::stopAndGoBack()
+{
+	m_editor->m_song->stopAndGoBack();
+	getGUI()->pianoRoll()->stopRecording();
+}
 
 void SongEditorWindow::lostFocus()
 {

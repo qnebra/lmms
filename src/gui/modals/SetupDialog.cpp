@@ -148,6 +148,8 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 			"audioengine", "hqaudio").toInt()),
 	m_bufferSize(ConfigManager::inst()->value(
 			"audioengine", "framesperaudiobuffer").toInt()),
+	m_bounceDir(QDir::toNativeSeparators(ConfigManager::inst()->bounceDir())),
+	m_externalEditor(QDir::toNativeSeparators(ConfigManager::inst()->externalEditor())),
 	m_workingDir(QDir::toNativeSeparators(ConfigManager::inst()->workingDir())),
 	m_vstDir(QDir::toNativeSeparators(ConfigManager::inst()->vstDir())),
 	m_ladspaDir(QDir::toNativeSeparators(ConfigManager::inst()->ladspaDir())),
@@ -604,7 +606,7 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 	int currIdx = m_prefFormat->findText(ConfigManager::inst()->value("outputprefs", "format"));
 	if (currIdx >= 0)
 	{
-	m_prefFormat->setCurrentIndex(currIdx);
+		m_prefFormat->setCurrentIndex(currIdx);
 	}
 	outputPrefsLayout->addWidget(new QLabel("preferred output format"));
 	outputPrefsLayout->addWidget(m_prefFormat);
@@ -617,7 +619,7 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 	currIdx = m_prefStereoMode->findText(ConfigManager::inst()->value("outputprefs", "stereomode"));
 	if (currIdx >= 0)
 	{
-	m_prefStereoMode->setCurrentIndex(currIdx);
+		m_prefStereoMode->setCurrentIndex(currIdx);
 	}
 	outputPrefsLayout->addWidget(new QLabel("preferred stereo mode"));
 	outputPrefsLayout->addWidget(m_prefStereoMode);
@@ -633,7 +635,7 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 	currIdx = m_prefBitrate->findText(ConfigManager::inst()->value("outputprefs", "bitrate"));
 	if (currIdx >= 0)
 	{
-	m_prefBitrate->setCurrentIndex(currIdx);
+		m_prefBitrate->setCurrentIndex(currIdx);
 	}
 	outputPrefsLayout->addWidget(new QLabel("preferred bit rate"));
 	outputPrefsLayout->addWidget(m_prefBitrate);
@@ -646,7 +648,7 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 	currIdx = m_prefBitdepth->findText(ConfigManager::inst()->value("outputprefs", "bitdepth"));
 	if (currIdx >= 0)
 	{
-	m_prefBitdepth->setCurrentIndex(currIdx);
+		m_prefBitdepth->setCurrentIndex(currIdx);
 	}
 	outputPrefsLayout->addWidget(new QLabel("preferred bit depth"));
 	outputPrefsLayout->addWidget(m_prefBitdepth);
@@ -661,7 +663,7 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 	currIdx = m_prefSamplerate->findText(ConfigManager::inst()->value("outputprefs", "samplerate"));
 	if (currIdx >= 0)
 	{
-	m_prefSamplerate->setCurrentIndex(currIdx);
+		m_prefSamplerate->setCurrentIndex(currIdx);
 	}
 	outputPrefsLayout->addWidget(new QLabel("preferred sample rate"));
 	outputPrefsLayout->addWidget(m_prefSamplerate);
@@ -675,7 +677,7 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 	currIdx = m_prefInterpolation->findText(ConfigManager::inst()->value("outputprefs", "interpolation"));
 	if (currIdx >= 0)
 	{
-	m_prefInterpolation->setCurrentIndex(currIdx);
+		m_prefInterpolation->setCurrentIndex(currIdx);
 	}
 	outputPrefsLayout->addWidget(new QLabel("preferred interpolation"));
 	outputPrefsLayout->addWidget(m_prefInterpolation);
@@ -689,7 +691,7 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 	currIdx = m_prefOversampling->findText(ConfigManager::inst()->value("outputprefs", "oversampling"));
 	if (currIdx >= 0)
 	{
-	m_prefOversampling->setCurrentIndex(currIdx);
+		m_prefOversampling->setCurrentIndex(currIdx);
 	}
 	outputPrefsLayout->addWidget(new QLabel("preferred oversampling"));
 	outputPrefsLayout->addWidget(m_prefOversampling);
@@ -701,7 +703,7 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 	currIdx = m_prefBounceFormat->findText(ConfigManager::inst()->value("outputprefs", "bounceformat"));
 	if (currIdx >= 0)
 	{
-	m_prefBounceFormat->setCurrentIndex(currIdx);
+		m_prefBounceFormat->setCurrentIndex(currIdx);
 	}
 	outputPrefsLayout->addWidget(new QLabel("preferred format when bouncing clips"));
 	outputPrefsLayout->addWidget(m_prefBounceFormat);
@@ -897,15 +899,19 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 		m_sf2FileLineEdit);
 #endif
 
-    // Audio output preferences
-    addPathEntry(tr("Export directory"), m_prefExportDir,
-        SLOT(setPrefExportDir(const QString&)),
-        SLOT(openPrefExportDir()),
-        m_prefExportDirLineEdit);
-    addPathEntry(tr("Bounce directory"), m_bounceDir,
-        SLOT(setBounceDir(const QString&)),
-        SLOT(openBounceDir()),
-        m_bounceDirLineEdit);
+	// Audio output preferences
+	addPathEntry(tr("Export directory"), m_prefExportDir,
+		SLOT(setPrefExportDir(const QString&)),
+		SLOT(openPrefExportDir()),
+		m_prefExportDirLineEdit);
+	addPathEntry(tr("Bounce directory"), m_bounceDir,
+		SLOT(setBounceDir(const QString&)),
+		SLOT(openBounceDir()),
+		m_bounceDirLineEdit);
+	addPathEntry(tr("External editor"), m_externalEditor,
+		SLOT(setExternalEditor(const QString&)),
+		SLOT(chooseExternalEditor()),
+		m_externalEditorLineEdit);
 
 	addPathEntry(tr("GIG directory"), m_gigDir,
 		SLOT(setGIGDir(const QString&)),
@@ -1083,15 +1089,15 @@ void SetupDialog::accept()
 					m_midiIfaceNames[m_midiInterfaces->currentText()]);
 	ConfigManager::inst()->setValue("midi", "midiautoassign",
 					m_assignableMidiDevices->currentText());
-    // audio output prefs
-    ConfigManager::inst()->setValue("outputprefs", "format", m_prefFormat->currentText());
-    ConfigManager::inst()->setValue("outputprefs", "bitrate", m_prefBitrate->currentText());
-    ConfigManager::inst()->setValue("outputprefs", "bitdepth", m_prefBitdepth->currentText());
-    ConfigManager::inst()->setValue("outputprefs", "samplerate", m_prefSamplerate->currentText());
-    ConfigManager::inst()->setValue("outputprefs", "stereomode", m_prefStereoMode->currentText());
-    ConfigManager::inst()->setValue("outputprefs", "interpolation", m_prefInterpolation->currentText());
-    ConfigManager::inst()->setValue("outputprefs", "oversampling", m_prefOversampling->currentText());
-    ConfigManager::inst()->setValue("outputprefs", "bounceformat", m_prefBounceFormat->currentText());
+	// audio output prefs
+	ConfigManager::inst()->setValue("outputprefs", "format", m_prefFormat->currentText());
+	ConfigManager::inst()->setValue("outputprefs", "bitrate", m_prefBitrate->currentText());
+	ConfigManager::inst()->setValue("outputprefs", "bitdepth", m_prefBitdepth->currentText());
+	ConfigManager::inst()->setValue("outputprefs", "samplerate", m_prefSamplerate->currentText());
+	ConfigManager::inst()->setValue("outputprefs", "stereomode", m_prefStereoMode->currentText());
+	ConfigManager::inst()->setValue("outputprefs", "interpolation", m_prefInterpolation->currentText());
+	ConfigManager::inst()->setValue("outputprefs", "oversampling", m_prefOversampling->currentText());
+	ConfigManager::inst()->setValue("outputprefs", "bounceformat", m_prefBounceFormat->currentText());
 
 
 	ConfigManager::inst()->setWorkingDir(QDir::fromNativeSeparators(m_workingDir));
@@ -1102,8 +1108,9 @@ void SetupDialog::accept()
 	ConfigManager::inst()->setSF2File(m_sf2File);
 #endif
 	ConfigManager::inst()->setGIGDir(QDir::fromNativeSeparators(m_gigDir));
-    ConfigManager::inst()->setPrefExportDir(QDir::fromNativeSeparators(m_prefExportDir));
-    ConfigManager::inst()->setBounceDir(QDir::fromNativeSeparators(m_bounceDir));
+	ConfigManager::inst()->setPrefExportDir(QDir::fromNativeSeparators(m_prefExportDir));
+	ConfigManager::inst()->setBounceDir(QDir::fromNativeSeparators(m_bounceDir));
+	ConfigManager::inst()->setExternalEditor(QDir::fromNativeSeparators(m_externalEditor));
 
 	ConfigManager::inst()->setThemeDir(QDir::fromNativeSeparators(m_themeDir));
 	ConfigManager::inst()->setBackgroundPicFile(m_backgroundPicFile);
@@ -1495,40 +1502,54 @@ void SetupDialog::openGIGDir()
 
 void SetupDialog::setPrefExportDir(const QString & exportDir)
 {
-    m_prefExportDir = exportDir;
+	m_prefExportDir = exportDir;
 }
 
 
 void SetupDialog::openPrefExportDir()
 {
-    QString new_dir = FileDialog::getExistingDirectory(this,
-        tr("Choose default export directory"), m_prefExportDir);
-    if(!new_dir.isEmpty())
-    {
-        m_prefExportDirLineEdit->setText(new_dir);
-    }
+	QString new_dir = FileDialog::getExistingDirectory(this,
+		tr("Choose default export directory"), m_prefExportDir);
+	if(!new_dir.isEmpty())
+	{
+		m_prefExportDirLineEdit->setText(new_dir);
+	}
 }
 
 
 void SetupDialog::setBounceDir(const QString & bounceDir)
 {
-    m_bounceDir = bounceDir;
+	m_bounceDir = bounceDir;
 }
 
 void SetupDialog::openBounceDir()
 {
-    QString new_dir = FileDialog::getExistingDirectory(this,
-        tr("Choose bounce directory"), m_bounceDir);
-    if(!new_dir.isEmpty())
-    {
-        m_bounceDirLineEdit->setText(new_dir);
-    }
+	QString new_dir = FileDialog::getExistingDirectory(this,
+		tr("Choose bounce directory"), m_bounceDir);
+	if (!new_dir.isEmpty())
+	{
+		m_bounceDirLineEdit->setText(new_dir);
+	}
 }
 
+void SetupDialog::setExternalEditor(const QString & externalEditor)
+{
+	m_externalEditor = externalEditor;
+}
+
+void SetupDialog::chooseExternalEditor()
+{
+	QString editor = FileDialog::getOpenFileName(this,
+		tr("Choose external editor"), "/usr/bin" , m_externalEditor);
+	if ( ! editor.isEmpty() )
+	{
+		m_externalEditorLineEdit->setText(editor);
+	}
+}
 
 void SetupDialog::setGIGDir(const QString & gigDir)
 {
-    m_gigDir = gigDir;
+	m_gigDir = gigDir;
 }
 
 void SetupDialog::openThemeDir()

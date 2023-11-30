@@ -168,8 +168,10 @@ protected:
 		RemoveGroove,
 		HumanizeVelocity,
 		HumanizeTiming,
+		HumanizeLength,
 		NudgeForward,
-		NudgeBack
+		NudgeBack,
+		Tuplets
 	};
 
 	enum class SemiToneMarkerAction
@@ -215,6 +217,7 @@ protected slots:
 	void recordAccompany();
 	bool toggleStepRecording();
 	void stop();
+	void stopAndGoBack();
 
 	void startRecordNote( const lmms::Note & n );
 	void finishRecordNote( const lmms::Note & n );
@@ -241,10 +244,12 @@ protected slots:
 	void quantizeNotes(QuantizeAction mode = QuantizeAction::Both);
 	void humanizeTiming(Note * n);
 	void humanizeVelocity(Note * n);
+	void humanizeLength(Note * n);
 	void quantizeGroove(Note * n);
 	void removeGroove(Note * n);
 	void nudgeForward(Note * n);
 	void nudgeBack(Note * n);
+	void alignTuplets();
 
 	void updateSemiToneMarkerMenu();
 
@@ -539,6 +544,7 @@ public:
 	void record() override;
 	void recordAccompany() override;
 	void toggleStepRecording() override;
+	void stopAndGoBack() override;
 	void stopRecording();
 
 	bool isRecording() const;

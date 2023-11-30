@@ -642,6 +642,20 @@ void Song::togglePause()
 
 
 
+void Song::stopAndGoBack()
+{
+	gui::TimeLineWidget * tl = getPlayPos().m_timeLine;
+	if ( tl )
+	{
+		tl->savePos(TimePos(0));
+		stop();
+		lmms::gui::getGUI()->songEditor()->m_editor->scrollToStart();
+	}
+}
+
+
+
+
 void Song::stop()
 {
 	// do not stop/reset things again if we're stopped already

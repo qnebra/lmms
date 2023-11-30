@@ -4065,6 +4065,16 @@ void PianoRoll::stop()
 
 
 
+void PianoRoll::stopAndGoBack()
+{
+	Engine::getSong()->stopAndGoBack();
+	m_recording = false;
+	m_scrollBack = ( m_timeLine->autoScroll() == TimeLineWidget::AutoScrollState::Enabled );
+}
+
+
+
+
 void PianoRoll::startRecordNote(const Note & n )
 {
 	if (hasValidMidiClip())
@@ -4088,16 +4098,10 @@ void PianoRoll::startRecordNote(const Note & n )
 				{
 					quint64 bpm = song->getTempo();
 					quint64 offsetMillis = song->getMilliseconds() - n1.pos().getTimeInMillis64(bpm);
-					qDebug("offsetMillis=%llu", offsetMillis);
 					f_cnt_t offset = (Engine::audioEngine()->processingSampleRate() * offsetMillis) / 1000;
 					if (offset > 0)
 					{
 						n1.setNoteOffset(offset);
-						qDebug("set noteOffset=%i", offset);
-					}
-					if (offset > Engine::framesPerTick())
-					{
-						qWarning("offset larger than a tick: %i", offset);
 					}
 				}
 				m_recordingNotes << n1;
@@ -4636,6 +4640,12 @@ void PianoRoll::quantizeNotes(QuantizeAction mode)
 		}
 	}
 
+	if (mode == QuantizeAction::Tuplets)
+	{
+		alignTuplets();
+		return;
+	}
+
 	for( Note* n : notes )
 	{
 		if( n->length() == TimePos( 0 ) )
@@ -4651,6 +4661,11 @@ void PianoRoll::quantizeNotes(QuantizeAction mode)
 		if (mode == QuantizeAction::HumanizeVelocity)
 		{
 			humanizeVelocity(n);
+			continue;
+		}
+		if (mode == QuantizeAction::HumanizeLength)
+		{
+			humanizeLength(n);
 			continue;
 		}
 		if (mode == QuantizeAction::Groove)
@@ -4673,7 +4688,6 @@ void PianoRoll::quantizeNotes(QuantizeAction mode)
 			nudgeForward(n);
 			continue;
 		}
-
 		Note copy(*n);
 		m_midiClip->removeNote( n );
 		if (mode == QuantizeAction::Both || mode == QuantizeAction::Pos)
@@ -4710,6 +4724,18 @@ void PianoRoll::humanizeVelocity(Note * n)
 }
 
 
+void PianoRoll::humanizeLength(Note * n)
+{
+	TimePos length = n->length();
+	tick_t newlen = length.getTicks() + (std::rand() % 6) - 2;
+	qDebug("len = %i new len = %i", length.getTicks(), newlen);
+	if (newlen > 4) {
+		length.setTicks(newlen);
+		n->setLength(length);
+	}
+}
+
+
 void PianoRoll::quantizeGroove(Note * n)
 {
 	Engine::getSong()->globalGroove()->apply(n);
@@ -4731,6 +4757,35 @@ void PianoRoll::nudgeBack(Note * n)
 {
 	n->setNoteOffset(n->getNoteOffset() - Engine::framesPerTick() / 20);
 }
+
+
+void PianoRoll::alignTuplets()
+{
+	NoteVector notes = getSelectedNotes();
+	if ( notes.size() > 1)
+	{
+		float ticksPerNote = (float) DefaultTicksPerBar / (float) notes.size();
+
+		for ( int i = 1 ; i < notes.size() ; i++ )
+		{
+			Note * n = notes.at(i);
+
+			float ticksFloat = ticksPerNote * (float) i;
+			tick_t ticksInt = (tick_t) ticksFloat;
+			f_cnt_t offset = (ticksFloat - ticksInt) * Engine::framesPerTick();
+
+			Note copy(*n);
+			m_midiClip->removeNote( n );
+			copy.setPos(TimePos(ticksInt));
+			copy.setNoteOffset(offset);
+			m_midiClip->addNote(copy, false);
+
+		}
+	}
+
+}
+
+
 
 void PianoRoll::updateSemiToneMarkerMenu()
 {
@@ -4853,8 +4908,10 @@ PianoRollWindow::PianoRollWindow() :
 	auto removeGrooveAction = new QAction(tr("Remove groove"), this);
 	auto humanizeVelocityAction = new QAction(tr("Humanize velocity"), this);
 	auto humanizeTimingAction = new QAction(tr("Humanize timing"), this);
+	auto humanizeLengthAction = new QAction(tr("Humanize length"), this);
 	auto nudgeForwardAction = new QAction(tr("Nudge forward"), this);
 	auto nudgeBackAction = new QAction(tr("Nudge back"), this);
+	auto tupletsAction = new QAction(tr("Tuplets"), this);
 
 	connect(quantizeAction, &QAction::triggered, [this](){ m_editor->quantizeNotes(); });
 	connect(quantizePosAction, &QAction::triggered, [this](){ m_editor->quantizeNotes(PianoRoll::QuantizeAction::Pos); });
@@ -4863,8 +4920,11 @@ PianoRollWindow::PianoRollWindow() :
 	connect(removeGrooveAction, &QAction::triggered, [this](){ m_editor->quantizeNotes(PianoRoll::QuantizeAction::RemoveGroove); });
 	connect(humanizeVelocityAction, &QAction::triggered, [this](){ m_editor->quantizeNotes(PianoRoll::QuantizeAction::HumanizeVelocity); });
 	connect(humanizeTimingAction, &QAction::triggered, [this](){ m_editor->quantizeNotes(PianoRoll::QuantizeAction::HumanizeTiming); });
+	connect(humanizeLengthAction, &QAction::triggered, [this](){ m_editor->quantizeNotes(PianoRoll::QuantizeAction::HumanizeLength); });
 	connect(nudgeForwardAction, &QAction::triggered, [this](){ m_editor->quantizeNotes(PianoRoll::QuantizeAction::NudgeForward); });
 	connect(nudgeBackAction, &QAction::triggered, [this](){ m_editor->quantizeNotes(PianoRoll::QuantizeAction::NudgeBack); });
+	connect(tupletsAction, &QAction::triggered, [this](){ m_editor->quantizeNotes(PianoRoll::QuantizeAction::Tuplets); });
+
 
 	applyGrooveAction->setShortcut( Qt::CTRL | Qt::Key_G );
 	humanizeVelocityAction->setShortcut( Qt::CTRL | Qt::Key_H );
@@ -4878,8 +4938,10 @@ PianoRollWindow::PianoRollWindow() :
 	quantizeButtonMenu->addAction(removeGrooveAction);
 	quantizeButtonMenu->addAction(humanizeVelocityAction);
 	quantizeButtonMenu->addAction(humanizeTimingAction);
+	quantizeButtonMenu->addAction(humanizeLengthAction);
 	quantizeButtonMenu->addAction(nudgeForwardAction);
 	quantizeButtonMenu->addAction(nudgeBackAction);
+	quantizeButtonMenu->addAction(tupletsAction);
 
 	notesActionsToolBar->addAction( drawAction );
 	notesActionsToolBar->addAction( eraseAction );
@@ -5198,6 +5260,13 @@ void PianoRollWindow::stop()
 	m_editor->stop();
 }
 
+
+
+
+void PianoRollWindow::stopAndGoBack()
+{
+	m_editor->stopAndGoBack();
+}
 
 
 
