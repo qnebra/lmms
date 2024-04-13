@@ -85,7 +85,7 @@ bool WaveShaperEffect::processAudioBuffer( sampleFrame * _buf,
 	const float w = wetLevel();
 	float input = m_wsControls.m_inputModel.value();
 	float output = m_wsControls.m_outputModel.value();
-	std::vector<float> graphSamples = m_wsControls.m_vectorGraphModel.getDataArray(0)->getValues(200);
+	std::vector<float> graphSamples = m_wsControls.getGraphSamples();
 	//const float * samples = m_wsControls.m_wavegraphModel.samples();
 	const bool clip = m_wsControls.m_clipModel.value();
 
