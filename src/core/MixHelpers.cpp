@@ -89,6 +89,13 @@ void setNaNHandler( bool use )
 	s_NaNHandler = use;
 }
 
+bool sanitize(sampleFrame* buf, size_t frames)
+{
+	if (!useNaNHandler()) { return true; }
+	const auto handler = [](auto x) { return std::isinf(x) || std::isnan(x); };
+	return std::none_of(&buf[0], &buf[0] + frames * DEFAULT_CHANNELS, handler);
+}
+
 struct AddOp
 {
 	void operator()( sampleFrame& dst, const sampleFrame& src ) const
