@@ -552,11 +552,12 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 	connect(m_audioInterfaces, SIGNAL(activated(const QString&)),
 			this, SLOT(audioInterfaceChanged(const QString&)));
 
-	// Advanced setting, hidden for now
-	// // TODO Handle or remove.
-	// auto useNaNHandler = new LedCheckBox(tr("Use built-in NaN handler"), audio_w);
-	// audio_layout->addWidget(useNaNHandler);
-	// useNaNHandler->setChecked(m_NaNHandler);
+	auto sanitizationBox = new QGroupBox(tr("Sanitization"), audio_w);
+	auto sanitizationLayout = new QVBoxLayout(sanitizationBox);
+
+	auto useNaNHandler = new QCheckBox(tr("Check for Infs and NaNs in audio output"));
+	useNaNHandler->setChecked(m_NaNHandler);
+	sanitizationLayout->addWidget(useNaNHandler);
 
 	// Buffer size group
 	QGroupBox * bufferSizeBox = new QGroupBox(tr("Buffer size"), audio_w);
@@ -600,6 +601,7 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 	audio_layout->addWidget(audioInterfaceBox);
 	audio_layout->addWidget(as_w);
 	audio_layout->addWidget(bufferSizeBox);
+	audio_layout->addWidget(sanitizationBox);
 	audio_layout->addStretch();
 
 
