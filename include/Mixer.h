@@ -83,7 +83,6 @@ class MixerChannel : public ThreadableJob
 		void incrementDeps();
 		void processed();
 
-		static bool muteInvalidOutput();
 		static void setMuteInvalidOutput(bool mute);
 
 	private:
