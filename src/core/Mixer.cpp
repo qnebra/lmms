@@ -181,9 +181,9 @@ void MixerChannel::doProcessing()
 		m_peakLeft = m_peakRight = 0.0f;
 	}
 
-	if (!MixHelpers::sanitize(m_buffer, fpp))
+	if (MixHelpers::muteInvalidOutput() && !MixHelpers::invalid(m_buffer, fpp))
 	{
-		std::cerr << "Inf or NaN found in mixer channel " << m_channelIndex << ", muting output.\n";
+		std::cerr << "Invalid output found in mixer channel " << m_channelIndex << ", muting output.\n";
 		std::fill_n(m_buffer, fpp, sampleFrame{});
 	}
 

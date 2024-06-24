@@ -140,8 +140,8 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 			"ui", "vstalwaysontop").toInt()),
 	m_disableAutoQuit(ConfigManager::inst()->value(
 			"ui", "disableautoquit", "1").toInt()),
-	m_NaNHandler(ConfigManager::inst()->value(
-			"app", "nanhandler", "1").toInt()),
+	m_muteInvalidOutput(ConfigManager::inst()->value(
+			"app", "muteinvalidoutput", "1").toInt()),
 	m_bufferSize(ConfigManager::inst()->value(
 			"audioengine", "framesperaudiobuffer").toInt()),
 	m_midiAutoQuantize(ConfigManager::inst()->value(
@@ -555,9 +555,9 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 	auto sanitizationBox = new QGroupBox(tr("Sanitization"), audio_w);
 	auto sanitizationLayout = new QVBoxLayout(sanitizationBox);
 
-	auto useNaNHandler = new QCheckBox(tr("Check for Infs and NaNs in audio output"));
-	useNaNHandler->setChecked(m_NaNHandler);
-	sanitizationLayout->addWidget(useNaNHandler);
+	auto muteInvalidOutput = new QCheckBox(tr("Mute mixer channels with invalid output (Inf, NaN, or out of range])"));
+	muteInvalidOutput->setChecked(m_muteInvalidOutput);
+	sanitizationLayout->addWidget(muteInvalidOutput);
 
 	// Buffer size group
 	QGroupBox * bufferSizeBox = new QGroupBox(tr("Buffer size"), audio_w);
@@ -963,8 +963,8 @@ void SetupDialog::accept()
 					QString::number(m_disableAutoQuit));
 	ConfigManager::inst()->setValue("audioengine", "audiodev",
 					m_audioIfaceNames[m_audioInterfaces->currentText()]);
-	ConfigManager::inst()->setValue("app", "nanhandler",
-					QString::number(m_NaNHandler));
+	ConfigManager::inst()->setValue("app", "muteinvalidoutput",
+					QString::number(m_muteInvalidOutput));
 	ConfigManager::inst()->setValue("audioengine", "framesperaudiobuffer",
 					QString::number(m_bufferSize));
 	ConfigManager::inst()->setValue("audioengine", "mididev",

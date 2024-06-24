@@ -35,7 +35,7 @@
 
 
 
-static bool s_NaNHandler;
+static bool s_muteInvalidOutput;
 
 
 namespace lmms::MixHelpers
@@ -79,20 +79,19 @@ bool isSilent( const sampleFrame* src, int frames )
 	return true;
 }
 
-bool useNaNHandler()
+bool muteInvalidOutput()
 {
-	return s_NaNHandler;
+	return s_muteInvalidOutput;
 }
 
-void setNaNHandler( bool use )
+void setMuteInvalidOutput(bool use)
 {
-	s_NaNHandler = use;
+	s_muteInvalidOutput = use;
 }
 
-bool sanitize(sampleFrame* buf, size_t frames)
+bool invalid(sampleFrame* buf, size_t frames)
 {
-	if (!useNaNHandler()) { return false; }
-	const auto handler = [](auto x) { return std::isinf(x) || std::isnan(x); };
+	const auto handler = [](auto x) { return std::isinf(x) || std::isnan(x) || x < -1.0f || x > 1.0f; };
 	return std::any_of(&buf[0][0], &buf[0][0] + frames * DEFAULT_CHANNELS, handler);
 }
 

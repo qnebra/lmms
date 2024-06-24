@@ -36,12 +36,12 @@ namespace MixHelpers
 
 bool isSilent( const sampleFrame* src, int frames );
 
-bool useNaNHandler();
+bool muteInvalidOutput();
 
-void setNaNHandler( bool use );
+void setMuteInvalidOutput(bool use);
 
-/*! Returns `true` if an Inf or NaN is found within `buf` */
-bool sanitize(sampleFrame* buf, size_t frames);
+/*! Returns `true` if invalid output (Inf, NaN, or out of range) is found within `buf` */
+bool invalid(sampleFrame* buf, size_t frames);
 
 /*! \brief Add samples from src to dst */
 void add( sampleFrame* dst, const sampleFrame* src, int frames );
