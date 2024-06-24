@@ -36,7 +36,7 @@ namespace MixHelpers
 
 bool isSilent( const sampleFrame* src, int frames );
 
-/*! Returns `true` if invalid output (Inf, NaN, or out of range) is found within `buf` */
+/*! Returns `true` if invalid output (Inf or NaN) is found within `buf` */
 bool invalid(sampleFrame* buf, size_t frames);
 
 /*! \brief Add samples from src to dst */
