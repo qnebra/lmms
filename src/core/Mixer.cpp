@@ -23,6 +23,7 @@
  */
 
 #include <QDomElement>
+#include <iostream>
 
 #include "AudioEngine.h"
 #include "AudioEngineWorkerThread.h"
@@ -178,6 +179,12 @@ void MixerChannel::doProcessing()
 	else
 	{
 		m_peakLeft = m_peakRight = 0.0f;
+	}
+
+	if (!MixHelpers::sanitize(m_buffer, fpp))
+	{
+		std::cerr << "Inf or NaN found in mixer channel " << m_channelIndex << ", muting output.\n";
+		std::fill_n(m_buffer, fpp, sampleFrame{});
 	}
 
 	// increment dependency counter of all receivers

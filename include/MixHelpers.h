@@ -40,7 +40,7 @@ bool useNaNHandler();
 
 void setNaNHandler( bool use );
 
-/*! Returns true if no Inf or NaN is found within `buf` */
+/*! Returns `true` if an Inf or NaN is found within `buf` */
 bool sanitize(sampleFrame* buf, size_t frames);
 
 /*! \brief Add samples from src to dst */
