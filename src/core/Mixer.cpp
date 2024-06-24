@@ -118,6 +118,28 @@ void MixerChannel::setMuteInvalidOutput(bool mute)
 	s_muteInvalidOutput = mute;
 }
 
+void MixerChannel::sanitizeOutput()
+{
+	const auto fpp = Engine::audioEngine()->framesPerPeriod();
+	if (s_muteInvalidOutput && MixHelpers::invalid(m_buffer, fpp))
+	{
+		std::fill_n(m_buffer, fpp, sampleFrame{});
+		m_peakLeft = 0.0f;
+		m_peakRight = 0.0f;
+
+		if (!m_hasInvalidOutput)
+		{
+			m_hasInvalidOutput = true;
+			emit hasInvalidOutput(true);
+		}
+	}
+	else if (m_hasInvalidOutput)
+	{
+		m_hasInvalidOutput = false;
+		emit hasInvalidOutput(false);
+	}
+}
+
 
 
 void MixerChannel::doProcessing()
@@ -185,14 +207,7 @@ void MixerChannel::doProcessing()
 		m_peakLeft = m_peakRight = 0.0f;
 	}
 
-	if (s_muteInvalidOutput && MixHelpers::invalid(m_buffer, fpp))
-	{
-		std::fill_n(m_buffer, fpp, sampleFrame{});
-		m_peakLeft = 0.0f;
-		m_peakRight = 0.0f;
-	}
-
-	// increment dependency counter of all receivers
+	sanitizeOutput();
 	processed();
 }
 
