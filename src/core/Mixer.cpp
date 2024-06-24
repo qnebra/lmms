@@ -195,6 +195,8 @@ void MixerChannel::doProcessing()
 	{
 		std::cerr << "Invalid output found in mixer channel " << m_channelIndex << ", muting output.\n";
 		std::fill_n(m_buffer, fpp, sampleFrame{});
+		m_peakLeft = 0.0f;
+		m_peakRight = 0.0f;
 	}
 
 	// increment dependency counter of all receivers
