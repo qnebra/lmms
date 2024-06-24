@@ -558,6 +558,7 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 	auto muteInvalidOutput = new QCheckBox(tr("Mute mixer channels with invalid output"));
 	muteInvalidOutput->setChecked(m_muteInvalidOutput);
 	sanitizationLayout->addWidget(muteInvalidOutput);
+	connect(muteInvalidOutput, &QCheckBox::stateChanged, [this](bool checked) { m_muteInvalidOutput = checked; });
 
 	// Buffer size group
 	QGroupBox * bufferSizeBox = new QGroupBox(tr("Buffer size"), audio_w);
