@@ -114,6 +114,16 @@ void MixerChannel::unmuteForSolo()
 	m_muteModel.setValue(false);
 }
 
+bool MixerChannel::muteInvalidOutput()
+{
+	return s_muteInvalidOutput;
+}
+
+void MixerChannel::setMuteInvalidOutput(bool mute)
+{
+	s_muteInvalidOutput = mute;
+}
+
 
 
 void MixerChannel::doProcessing()
@@ -181,7 +191,7 @@ void MixerChannel::doProcessing()
 		m_peakLeft = m_peakRight = 0.0f;
 	}
 
-	if (MixHelpers::muteInvalidOutput() && !MixHelpers::invalid(m_buffer, fpp))
+	if (s_muteInvalidOutput && MixHelpers::invalid(m_buffer, fpp))
 	{
 		std::cerr << "Invalid output found in mixer channel " << m_channelIndex << ", muting output.\n";
 		std::fill_n(m_buffer, fpp, sampleFrame{});

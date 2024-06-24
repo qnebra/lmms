@@ -33,11 +33,6 @@
 
 #include "ValueBuffer.h"
 
-
-
-static bool s_muteInvalidOutput;
-
-
 namespace lmms::MixHelpers
 {
 
@@ -77,16 +72,6 @@ bool isSilent( const sampleFrame* src, int frames )
 	}
 
 	return true;
-}
-
-bool muteInvalidOutput()
-{
-	return s_muteInvalidOutput;
-}
-
-void setMuteInvalidOutput(bool use)
-{
-	s_muteInvalidOutput = use;
 }
 
 bool invalid(sampleFrame* buf, size_t frames)

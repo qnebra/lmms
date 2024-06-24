@@ -36,10 +36,6 @@ namespace MixHelpers
 
 bool isSilent( const sampleFrame* src, int frames );
 
-bool muteInvalidOutput();
-
-void setMuteInvalidOutput(bool use);
-
 /*! Returns `true` if invalid output (Inf, NaN, or out of range) is found within `buf` */
 bool invalid(sampleFrame* buf, size_t frames);
 

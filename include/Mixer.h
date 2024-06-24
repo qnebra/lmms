@@ -82,11 +82,14 @@ class MixerChannel : public ThreadableJob
 		std::atomic_int m_dependenciesMet;
 		void incrementDeps();
 		void processed();
-		
+
+		static bool muteInvalidOutput();
+		static void setMuteInvalidOutput(bool mute);
+
 	private:
 		void doProcessing() override;
-
 		std::optional<QColor> m_color;
+		inline static bool s_muteInvalidOutput = false;
 };
 
 class MixerRoute : public QObject

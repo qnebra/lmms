@@ -555,7 +555,7 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 	auto sanitizationBox = new QGroupBox(tr("Sanitization"), audio_w);
 	auto sanitizationLayout = new QVBoxLayout(sanitizationBox);
 
-	auto muteInvalidOutput = new QCheckBox(tr("Mute mixer channels with invalid output (Inf, NaN, or out of range])"));
+	auto muteInvalidOutput = new QCheckBox(tr("Mute mixer channels with invalid output"));
 	muteInvalidOutput->setChecked(m_muteInvalidOutput);
 	sanitizationLayout->addWidget(muteInvalidOutput);
 
