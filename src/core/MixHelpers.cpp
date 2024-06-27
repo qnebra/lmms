@@ -24,10 +24,6 @@
 
 #include "MixHelpers.h"
 
-#ifdef LMMS_DEBUG
-#include <cstdio>
-#endif
-
 #include <cmath>
 #include <QtGlobal>
 
@@ -72,12 +68,6 @@ bool isSilent( const sampleFrame* src, int frames )
 	}
 
 	return true;
-}
-
-bool invalid(sampleFrame* buf, size_t frames)
-{
-	const auto handler = [](auto x) { return std::isinf(x) || std::isnan(x); };
-	return std::any_of(&buf[0][0], &buf[0][0] + frames * DEFAULT_CHANNELS, handler);
 }
 
 struct AddOp

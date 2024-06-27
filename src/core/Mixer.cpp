@@ -23,6 +23,7 @@
  */
 
 #include <QDomElement>
+#include <algorithm>
 
 #include "AudioEngine.h"
 #include "AudioEngineWorkerThread.h"
@@ -35,6 +36,7 @@
 #include "PatternStore.h"
 #include "SampleTrack.h"
 #include "TrackContainer.h" // For TrackContainer::TrackList typedef
+#include "lmms_basics.h"
 
 namespace lmms
 {
@@ -120,8 +122,15 @@ void MixerChannel::setMuteInvalidOutput(bool mute)
 
 void MixerChannel::sanitizeOutput()
 {
+	if (!s_muteInvalidOutput) { return; }
+
 	const auto fpp = Engine::audioEngine()->framesPerPeriod();
-	if (s_muteInvalidOutput && MixHelpers::invalid(m_buffer, fpp))
+	const auto begin = &m_buffer[0][0];
+	const auto end = &m_buffer[0][0] + fpp * DEFAULT_CHANNELS;
+	const auto handler = [](auto x) { return std::isinf(x) || std::isnan(x); };
+	const auto it = std::find_if(begin, end, handler);
+
+	if (it != end)
 	{
 		std::fill_n(m_buffer, fpp, sampleFrame{});
 		m_peakLeft = 0.0f;
