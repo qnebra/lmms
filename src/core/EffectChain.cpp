@@ -30,7 +30,6 @@
 #include "EffectChain.h"
 #include "Effect.h"
 #include "DummyEffect.h"
-#include "MixHelpers.h"
 
 namespace lmms
 {
