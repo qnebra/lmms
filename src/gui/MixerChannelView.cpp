@@ -497,7 +497,7 @@ namespace lmms::gui
         if (invalid)
         {
             m_muteButton->setInactiveGraphic(embed::getIconPixmap("led_red"));
-            m_muteButton->setToolTip(tr("Mixer channel is muted internally because of invalid output"));
+            m_muteButton->setToolTip(tr("Mixer channel is muted because of invalid output"));
         }
         else
         {
