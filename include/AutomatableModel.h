@@ -323,7 +323,9 @@ public slots:
 	void unlinkControllerConnection();
 	void setUseControllerValue(bool b = true);
 
-
+signals:
+	// runs when setValue was successful
+	void setValueEvent();
 protected:
 	AutomatableModel(
 						const float val = 0,
