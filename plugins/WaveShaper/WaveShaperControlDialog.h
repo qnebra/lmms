@@ -27,7 +27,6 @@
 #define _WAVESHAPER_CONTROL_DIALOG_H
 
 #include "EffectControlDialog.h"
-#include "VectorGraphView.h"
 
 namespace lmms
 {
@@ -46,11 +45,8 @@ public:
 	~WaveShaperControlDialog() override = default;
 
 
-private slots:
-	void simplifyClicked();
 private:
-	
-	VectorGraphView* m_vectorGraphWidget;
+
 } ;
 
 

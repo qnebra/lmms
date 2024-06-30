@@ -26,11 +26,9 @@
 #ifndef WAVESHAPER_CONTROLS_H
 #define WAVESHAPER_CONTROLS_H
 
-#include <vector>
-
 #include "EffectControls.h"
 #include "WaveShaperControlDialog.h"
-#include "VectorGraphModel.h"
+#include "Graph.h"
 
 namespace lmms
 {
@@ -65,28 +63,26 @@ public:
 		return( new gui::WaveShaperControlDialog( this ) );
 	}
 
-	std::vector<float>* getGraphSamples();
 
 private slots:
-	void resetClicked();
+	void samplesChanged( int, int );
 
-	void vectorGraphChanged();
-signals:
-	// connected to dataArrayChanged()
-	// shouldUseGetLastValues: when the graph is redrawn
-	// should it use the last updated values instead of updating again
-	void vectorGraphUpdateView(bool shouldUseGetLastValues);
+	void resetClicked();
+	void smoothClicked();
+
+	void addOneClicked();
+	void subOneClicked();
+
 private:
 	WaveShaperEffect * m_effect;
 	FloatModel m_inputModel;
 	FloatModel m_outputModel;
-	VectorGraphModel m_vectorGraphModel;
+	graphModel m_wavegraphModel;
 	BoolModel  m_clipModel;
 
 	friend class gui::WaveShaperControlDialog;
 	friend class WaveShaperEffect;
 
-	std::vector<float> m_vectorGraphSampleBuffer;
 } ;
 
 
