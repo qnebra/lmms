@@ -26,7 +26,7 @@
 #include "embed.h"
 #include "plugin_export.h"
 
-#define DB2LIN(X) pow(10, (X) / 20.0f)
+#define DB2LIN(X) pow(10, X / 20.0f);
 
 namespace lmms
 {
@@ -89,20 +89,29 @@ bool ReverbSCEffect::processAudioBuffer( sampleFrame* buf, const fpp_t frames )
 	SPFLOAT tmpL, tmpR;
 	SPFLOAT dcblkL, dcblkR;
 
+	ValueBuffer * inGainBuf = m_reverbSCControls.m_inputGainModel.valueBuffer();
+	ValueBuffer * sizeBuf = m_reverbSCControls.m_sizeModel.valueBuffer();
+	ValueBuffer * colorBuf = m_reverbSCControls.m_colorModel.valueBuffer();
+	ValueBuffer * outGainBuf = m_reverbSCControls.m_outputGainModel.valueBuffer();
+
 	for( fpp_t f = 0; f < frames; ++f )
 	{
 		auto s = std::array{buf[f][0], buf[f][1]};
 
 		const auto inGain
-			= static_cast<SPFLOAT>(DB2LIN(m_reverbSCControls.m_inputGainModel.valueAt(f)));
+			= (SPFLOAT)DB2LIN((inGainBuf ? inGainBuf->values()[f] : m_reverbSCControls.m_inputGainModel.value()));
 		const auto outGain
-			= static_cast<SPFLOAT>(DB2LIN(m_reverbSCControls.m_outputGainModel.valueAt(f)));
+			= (SPFLOAT)DB2LIN((outGainBuf ? outGainBuf->values()[f] : m_reverbSCControls.m_outputGainModel.value()));
 
 		s[0] *= inGain;
 		s[1] *= inGain;
-		revsc->feedback = static_cast<SPFLOAT>(m_reverbSCControls.m_sizeModel.valueAt(f));
+		revsc->feedback = (SPFLOAT)(sizeBuf ?
+			sizeBuf->values()[f]
+			: m_reverbSCControls.m_sizeModel.value());
 
-		revsc->lpfreq = static_cast<SPFLOAT>(m_reverbSCControls.m_colorModel.valueAt(f));
+		revsc->lpfreq = (SPFLOAT)(colorBuf ?
+			colorBuf->values()[f]
+			: m_reverbSCControls.m_colorModel.value());
 
 
 		sp_revsc_compute(sp, revsc, &s[0], &s[1], &tmpL, &tmpR);

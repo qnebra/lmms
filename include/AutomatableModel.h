@@ -33,6 +33,7 @@
 #include "JournallingObject.h"
 #include "Model.h"
 #include "TimePos.h"
+#include "ValueBuffer.h"
 #include "ModelVisitor.h"
 
 
@@ -173,7 +174,7 @@ public:
 
 	//! @brief Function that returns sample-exact data as a ValueBuffer
 	//! @return pointer to model's valueBuffer when s.ex.data exists, NULL otherwise
-	std::vector<float>* valueBuffer();
+	ValueBuffer * valueBuffer();
 
 	template<class T>
 	T initValue() const
@@ -208,9 +209,6 @@ public:
 	float scaledValue( float value ) const;
 	//! @brief Returns value applied with the inverse of this model's scale type
 	float inverseScaledValue( float value ) const;
-
-	//! @brief Returns the value at a buffer, if buffer not exists, returns fixed value
-	float valueAt(size_t index);
 
 	void setInitValue( const float value );
 
@@ -408,7 +406,7 @@ private:
 	ControllerConnection* m_controllerConnection;
 
 
-	std::vector<float> m_valueBuffer;
+	ValueBuffer m_valueBuffer;
 	long m_lastUpdatedPeriod;
 	static long s_periodCounter;
 
@@ -436,13 +434,6 @@ public:
 	{
 		return AutomatableModel::value<T>( frameOffset );
 	}
-
-	T valueAt(size_t index, int frameOffset = 0)
-    {
-		const auto buffer = valueBuffer();
-		size_t clampedIndex = std::clamp<size_t>(index, 0, buffer->size());
-		return buffer ? (*buffer)[clampedIndex] : value(frameOffset);
-    }
 
 	T initValue() const
 	{

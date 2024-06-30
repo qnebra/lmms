@@ -36,6 +36,7 @@
 #include "LadspaControl.h"
 #include "LadspaSubPluginFeatures.h"
 #include "AutomationClip.h"
+#include "ValueBuffer.h"
 #include "Song.h"
 
 #include "embed.h"
@@ -172,10 +173,10 @@ bool LadspaEffect::processAudioBuffer( sampleFrame * _buf,
 					break;
 				case BufferRate::AudioRateInput:
 				{
-					auto* vb = pp->control->valueBuffer();
+					ValueBuffer * vb = pp->control->valueBuffer();
 					if( vb )
 					{
-						memcpy(pp->buffer, vb->data(), frames * sizeof(float));
+						memcpy( pp->buffer, vb->values(), frames * sizeof(float) );
 					}
 					else
 					{

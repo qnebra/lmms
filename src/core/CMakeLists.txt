@@ -85,6 +85,7 @@ set(LMMS_SRCS
 	core/UpgradeExtendedNoteRange.h
 	core/UpgradeExtendedNoteRange.cpp
 	core/Clip.cpp
+	core/ValueBuffer.cpp
 	core/VstSyncController.cpp
 	core/StepRecorder.cpp
 

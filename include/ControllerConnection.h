@@ -33,6 +33,7 @@
 
 #include "Controller.h"
 #include "JournallingObject.h"
+#include "ValueBuffer.h"
 
 #include <vector>
 
@@ -72,7 +73,7 @@ public:
 		return m_controller->currentValue( _offset );
 	}
 	
-	std::vector<float>* valueBuffer()
+	ValueBuffer * valueBuffer()
 	{
 		return m_controller->valueBuffer();
 	}

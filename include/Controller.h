@@ -30,6 +30,7 @@
 #include "Engine.h"
 #include "Model.h"
 #include "JournallingObject.h"
+#include "ValueBuffer.h"
 
 namespace lmms
 {
@@ -69,7 +70,7 @@ public:
 
 	virtual float currentValue( int _offset );
 	// The per-controller get-value-in-buffers function
-	virtual std::vector<float>* valueBuffer();
+	virtual ValueBuffer * valueBuffer();
 
 	inline bool isSampleExact() const
 	{
@@ -154,7 +155,7 @@ protected:
 	// buffer for storing sample-exact values in case there
 	// are more than one model wanting it, so we don't have to create it
 	// again every time
-	std::vector<float> m_valueBuffer;
+	ValueBuffer m_valueBuffer;
 	// when we last updated the valuebuffer - so we know if we have to update it
 	long m_bufferLastUpdated;
 
