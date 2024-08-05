@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef MIXER_CHANNEL_VIEW_H
-#define MIXER_CHANNEL_VIEW_H
+#ifndef LMMS_MIXER_CHANNEL_VIEW_H
+#define LMMS_MIXER_CHANNEL_VIEW_H
 
 #include <QGraphicsView>
 #include <QLabel>
@@ -141,4 +141,4 @@ private:
 };
 } // namespace lmms::gui
 
-#endif
+#endif // LMMS_MIXER_CHANNEL_VIEW_H
