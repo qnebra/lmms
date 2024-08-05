@@ -42,7 +42,6 @@
 #include "PeakIndicator.h"
 #include "Song.h"
 #include "gui_templates.h"
-#include "lmms_math.h"
 
 namespace lmms::gui {
 MixerChannelView::MixerChannelView(QWidget* parent, MixerView* mixerView, int channelIndex)
