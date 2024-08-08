@@ -27,6 +27,8 @@
 #include "TrackLabelButton.h"
 
 #include <QMouseEvent>
+#include <QHBoxLayout>
+#include <QMenu>
 
 #include "ConfigManager.h"
 #include "embed.h"
@@ -50,12 +52,21 @@ TrackLabelButton::TrackLabelButton( TrackView * _tv, QWidget * _parent ) :
 	setAcceptDrops( true );
 	setCursor( QCursor( embed::getIconPixmap( "hand" ), 3, 3 ) );
 	setToolButtonStyle( Qt::ToolButtonTextBesideIcon );
-	m_renameLineEdit = new TrackRenameLineEdit( this );
+
+	QWidget *container = new QWidget(this);
+    QHBoxLayout *layout = new QHBoxLayout(container);
+    layout->setContentsMargins(30, 0, 5, 0);
+    layout->setSpacing(0);
+	
+	m_renameLineEdit = new TrackRenameLineEdit(container);
 	auto font = QFont();
 	font.setPointSize(8);
 	m_renameLineEdit->setFont(font);
-	m_renameLineEdit->hide();
-	
+	m_renameLineEdit->setStyleSheet("background: transparent;");
+	m_renameLineEdit->setText(m_trackView->m_track->name());
+	m_renameLineEdit->setEnabled(false);
+	layout->addWidget(m_renameLineEdit);
+
 	if (isInCompactMode())
 	{
 		setFixedSize( 32, 29 );
@@ -63,17 +74,17 @@ TrackLabelButton::TrackLabelButton( TrackView * _tv, QWidget * _parent ) :
 	else
 	{
 		setFixedSize( 160, 29 );
-		m_renameLineEdit->move(25, ( height() / 2  - m_renameLineEdit->sizeHint().height() / 2 ) + 1);
-		m_renameLineEdit->setFixedWidth(width() - 31);
 		connect( m_renameLineEdit, SIGNAL(editingFinished()), this, SLOT(renameFinished()));
 	}
 	
 	setIconSize( QSize( 24, 24 ) );
-	connect( m_trackView->getTrack(), SIGNAL(dataChanged()), this, SLOT(update()));
-	connect( m_trackView->getTrack(), SIGNAL(nameChanged()), this, SLOT(nameChanged()));
+	container->setLayout(layout);
+	container->setGeometry(0, 0, width(), height());
+	container->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+
+	connect( m_trackView->getTrack(), SIGNAL(dataChanged()), this, SLOT(updateName()));
+	connect( m_trackView->getTrack(), SIGNAL(nameChanged()), this, SLOT(updateName()));
 }
-
-
 
 
 
@@ -85,7 +96,7 @@ void TrackLabelButton::rename()
 		QString txt = m_trackView->getTrack()->name();
 		RenameDialog renameDlg( txt );
 		renameDlg.exec();
-		if( txt != text() )
+		if(txt != m_trackView->getTrack()->name())
 		{
 			m_trackView->getTrack()->setName( txt );
 		}
@@ -93,7 +104,8 @@ void TrackLabelButton::rename()
 	else
 	{
 		QString txt = m_trackView->getTrack()->name();
-		m_renameLineEdit->show();
+		m_renameLineEdit->setStyleSheet("");
+		m_renameLineEdit->setEnabled(true);
 		m_renameLineEdit->setText( txt );
 		m_renameLineEdit->selectAll();
 		m_renameLineEdit->setFocus();
@@ -105,17 +117,21 @@ void TrackLabelButton::rename()
 
 void TrackLabelButton::renameFinished()
 {
+	m_renameLineEdit->setEnabled(false);
+	m_renameLineEdit->setStyleSheet("background: transparent;");
+
+	if (m_renameLineEdit->text() == "")
+	{
+		m_renameLineEdit->setText(m_trackView->getTrack()->name());
+		return;
+	}
+
 	if (!isInCompactMode())
 	{
 		m_renameLineEdit->clearFocus();
-		m_renameLineEdit->hide();
-		if( m_renameLineEdit->text() != "" )
+		if( m_renameLineEdit->text() != m_trackView->getTrack()->name() )
 		{
-			if( m_renameLineEdit->text() != m_trackView->getTrack()->name() )
-			{
-				setText( elideName( m_renameLineEdit->text() ) );
-				m_trackView->getTrack()->setName( m_renameLineEdit->text() );
-			}
+			m_trackView->getTrack()->setName( m_renameLineEdit->text() );
 		}
 	}
 }
@@ -123,9 +139,9 @@ void TrackLabelButton::renameFinished()
 
 
 
-void TrackLabelButton::nameChanged()
+void TrackLabelButton::updateName()
 {
-	setText( elideName( m_trackView->getTrack()->name() ) );
+	m_renameLineEdit->setText(m_trackView->getTrack()->name());
 }
 
 
@@ -148,18 +164,24 @@ void TrackLabelButton::dropEvent( QDropEvent * _de )
 
 
 
+void TrackLabelButton::contextMenuEvent(QContextMenuEvent *event)
+{
+    QMenu menu(this);
+    QAction *renameAction = menu.addAction(tr("Rename"));
+    QAction *selectedAction = menu.exec(event->globalPos());
+
+    if (selectedAction == renameAction) {
+        rename();
+    }
+}
+
+
+
 
 void TrackLabelButton::mousePressEvent( QMouseEvent * _me )
 {
-	if( _me->button() == Qt::RightButton )
-	{
-		rename();
-	}
-	else
-	{
-		m_buttonRect = QRect( this->mapToGlobal( pos() ), size() );
-		_me->ignore();
-	}
+	m_buttonRect = QRect( this->mapToGlobal( pos() ), size() );
+	_me->ignore();
 }
 
 
@@ -175,7 +197,7 @@ void TrackLabelButton::mouseDoubleClickEvent( QMouseEvent * _me )
 
 void TrackLabelButton::mouseReleaseEvent( QMouseEvent *_me )
 {
-	if( m_buttonRect.contains( _me->globalPos(), true ) && m_renameLineEdit->isHidden() )
+	if( m_buttonRect.contains( _me->globalPos(), true ) && !m_renameLineEdit->isEnabled() )
 	{
 		QToolButton::mousePressEvent( _me );
 	}
@@ -211,28 +233,7 @@ void TrackLabelButton::paintEvent(QPaintEvent* pe)
 }
 
 
-void TrackLabelButton::resizeEvent(QResizeEvent *_re)
-{
-	setText( elideName( m_trackView->getTrack()->displayName() ) );
-}
 
-
-
-
-QString TrackLabelButton::elideName( const QString &name )
-{
-	const int spacing = 16;
-	const int maxTextWidth = width() - spacing - iconSize().width();
-	if( maxTextWidth < 1 )
-	{
-		setToolTip( m_trackView->getTrack()->displayName() );
-		return QString( " " );
-	}
-	setToolTip( "" );
-	QFontMetrics metrics( font() );
-	QString elidedName = metrics.elidedText( name, Qt::ElideRight, maxTextWidth );
-	return elidedName;
-}
 
 bool TrackLabelButton::isInCompactMode() const
 {

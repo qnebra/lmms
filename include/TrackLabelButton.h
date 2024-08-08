@@ -46,21 +46,20 @@ public:
 
 
 public slots:
-	void rename();
 	void renameFinished();
-	void nameChanged();
-
+	void updateName();
 
 protected:
 	void dragEnterEvent( QDragEnterEvent * _dee ) override;
 	void dropEvent( QDropEvent * _de ) override;
+	void contextMenuEvent(QContextMenuEvent *event) override;
 	void mousePressEvent( QMouseEvent * _me ) override;
 	void mouseDoubleClickEvent( QMouseEvent * _me ) override;
 	void mouseReleaseEvent( QMouseEvent * _me ) override;
 	void paintEvent(QPaintEvent* pe) override;
-	void resizeEvent( QResizeEvent * _re ) override;
 
 private:
+	void rename();
 	bool isInCompactMode() const;
 
 private:
@@ -68,7 +67,6 @@ private:
 	std::string m_iconName;
 	TrackRenameLineEdit * m_renameLineEdit;
 	QRect m_buttonRect;
-	QString elideName( const QString &name );
 
 } ;
 
