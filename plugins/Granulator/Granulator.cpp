@@ -238,7 +238,7 @@ void Granulator::playNote( NotePlayHandle * _n,
 		int num_grains = m_numGrainsModel.value();
 		for (int g = 0; g < num_grains; g++)
 		{
-			SampleFrame* temporary_buffer = new SampleFrame[256];
+			SampleFrame* temporary_buffer = new SampleFrame[Engine::audioEngine()->framesPerPeriod()];
 			// Make every other grain be panned left vs right. Perhaps not the best way to do it, but for even number of grains it should work well.
 			float panning = g%2==0 ? m_widthModel.value()/100 : -m_widthModel.value()/100;
 			success = success && addGrain(_n, temporary_buffer, g, grain_size, static_cast<float>(g)/num_grains * grain_size, panning);
