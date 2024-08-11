@@ -63,7 +63,7 @@ Track::Track( Type type, TrackContainer * tc ) :
 	m_name(),                       /*!< The track's name */
 	m_mutedModel( false, this, tr( "Mute" ) ), /*!< For controlling track muting */
 	m_soloModel( false, this, tr( "Solo" ) ), /*!< For controlling track soloing */
-	m_simpleSerializingMode( false ),
+	m_presetMode(false),
 	m_clips()        /*!< The clips (segments) */
 {	
 	m_trackContainer->addTrack( this );
@@ -191,7 +191,7 @@ Track* Track::clone()
  */
 void Track::saveSettings( QDomDocument & doc, QDomElement & element )
 {
-	if( !m_simpleSerializingMode )
+	if (!isPresetMode())
 	{
 		element.setTagName( "track" );
 	}
@@ -217,9 +217,9 @@ void Track::saveSettings( QDomDocument & doc, QDomElement & element )
 	element.appendChild( tsDe );
 	saveTrackSpecificSettings( doc, tsDe );
 
-	if( m_simpleSerializingMode )
+	if (isPresetMode())
 	{
-		m_simpleSerializingMode = false;
+		setPresetMode(false);
 		return;
 	}
 
@@ -267,7 +267,7 @@ void Track::loadSettings( const QDomElement & element )
 		setColor(QColor{element.attribute("color")});
 	}
 
-	if( m_simpleSerializingMode )
+	if (isPresetMode())
 	{
 		QDomNode node = element.firstChild();
 		while( !node.isNull() )
@@ -279,7 +279,9 @@ void Track::loadSettings( const QDomElement & element )
 			}
 			node = node.nextSibling();
 		}
-		m_simpleSerializingMode = false;
+
+		setPresetMode(false);
+
 		return;
 	}
 

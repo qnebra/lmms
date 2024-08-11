@@ -860,7 +860,7 @@ void InstrumentTrack::saveTrackSpecificSettings( QDomDocument& doc, QDomElement 
 
 	// Save the midi port info if we are not in song saving mode, e.g. in
 	// track cloning mode or if we are in song saving mode and the user
-	// has chosen to discard the MIDI connections.
+	// has chosen not to discard the MIDI connections.
 	if (!Engine::getSong()->isSavingProject() ||
 	    !Engine::getSong()->getSaveOptions().discardMIDIConnections.value())
 	{
@@ -868,7 +868,11 @@ void InstrumentTrack::saveTrackSpecificSettings( QDomDocument& doc, QDomElement 
 		bool hasAuto = m_hasAutoMidiDev;
 		autoAssignMidiDevice(false);
 
-		m_midiPort.saveState( doc, thisElement );
+		// Only save the MIDI port information if we are not saving a preset.
+		if (!isPresetMode())
+		{
+			m_midiPort.saveState(doc, thisElement);
+		}
 
 		autoAssignMidiDevice(hasAuto);
 	}
@@ -1007,7 +1011,7 @@ void InstrumentTrack::replaceInstrument(DataFile dataFile)
 	int mixerChannel = mixerChannelModel()->value();
 
 	InstrumentTrack::removeMidiPortNode(dataFile);
-	setSimpleSerializing();
+	setPresetMode();
 	
 	//Replacing an instrument shouldn't change the solo/mute state.
 	bool oldMute = isMuted();
