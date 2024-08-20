@@ -22,18 +22,28 @@
  *
  */
 
+#include <list>
+#include <utility>
+
 #include <QMenu>
 #include <QMouseEvent>
 
 #include "AutomatableModelView.h"
+
 #include "AutomationClip.h"
+#include "AutomationNode.h"
+#include "AutomationTrack.h"
+#include "Clipboard.h"
 #include "ControllerConnectionDialog.h"
 #include "ControllerConnection.h"
 #include "embed.h"
+#include "Engine.h"
 #include "GuiApplication.h"
 #include "MainWindow.h"
 #include "StringPairDrag.h"
-#include "Clipboard.h"
+#include "Song.h"
+#include "SongEditor.h"
+
 
 #include "AutomationEditor.h"
 
@@ -80,6 +90,26 @@ void AutomatableModelView::addDefaultActions( QMenu* menu )
 	QAction* pasteAction = menu->addAction( embed::getIconPixmap( "edit_paste" ),
 						pasteDesc, amvSlots, SLOT(pasteFromClipboard()));
 	pasteAction->setEnabled(canPaste);
+
+	menu->addSeparator();
+
+	menu->addAction(QPixmap(),
+		AutomatableModel::tr("add automation node"),
+		amvSlots,
+		&AutomatableModelViewSlots::addSongAutomationNode);
+	QMenu* automationMenu = menu->addMenu(QPixmap(), AutomatableModel::tr("more automation"));
+	automationMenu->addAction(QPixmap(),
+		AutomatableModel::tr("add automation node to new clip"),
+		amvSlots,
+		&AutomatableModelViewSlots::addSongAutomationNodeAndClip);
+	automationMenu->addAction(QPixmap(),
+		AutomatableModel::tr("update closest automation node"),
+		amvSlots,
+		&AutomatableModelViewSlots::updateSongNearestAutomationNode);
+	automationMenu->addAction(QPixmap(),
+		AutomatableModel::tr("remove closest automation node"),
+		amvSlots,
+		&AutomatableModelViewSlots::removeSongNearestAutomationNode);
 
 	menu->addSeparator();
 
@@ -258,7 +288,256 @@ void AutomatableModelViewSlots::removeConnection()
 }
 
 
+void AutomatableModelViewSlots::addSongAutomationNode()
+{
+	// selecting the track with the most clips connected to this model
+	AutomationTrack* track = getCurrentAutomationTrackForModel(true);
+	// getting the clip before the current song time position
+	AutomationClip* clip = getCurrentAutomationClip(track, true, false);
 
+	// getting global song time
+	TimePos timePos = getCurrentPlayingPosition();
+	// account for the node's relative position inside clip
+	timePos -= clip->startPosition();
+
+	// adding model value
+	clip->recordValue(timePos, m_amv->modelUntyped()->getRawValueOrControllerValue());
+}
+
+void AutomatableModelViewSlots::addSongAutomationNodeAndClip()
+{
+	AutomationTrack* track = getCurrentAutomationTrackForModel(true);
+	AutomationClip* clip = getCurrentAutomationClip(track, false, false);
+
+	TimePos timePos = getCurrentPlayingPosition();
+
+	if (clip && clip->endPosition().getTicks() < timePos.getTicks())
+	{
+		AutomationClip* newClip = makeNewClip(track, timePos, true);
+		// copying the progressionType of the clip before
+		newClip->setProgressionType(clip->progressionType());
+		timePos -= newClip->startPosition();
+
+		newClip->recordValue(timePos, m_amv->modelUntyped()->getRawValueOrControllerValue());
+	}
+	else
+	{
+		addSongAutomationNode();
+	}
+}
+
+void AutomatableModelViewSlots::updateSongNearestAutomationNode()
+{
+	// getting the track without adding a new one if no track was found
+	AutomationTrack* track = getCurrentAutomationTrackForModel(false);
+	// this needs to be checked because getCurrentAutomationTrack might give
+	// a nullptr if it can not find and add a track
+	if (!track) { return; }
+
+	// getting nearest node position
+	AutomationNodeAtTimePos nodeClip = getNearestAutomationNode(track);
+	if (nodeClip.m_clip)
+	{
+		// modifying its value
+		nodeClip.m_clip->recordValue(nodeClip.m_position, m_amv->modelUntyped()->getRawValueOrControllerValue());
+	}
+}
+
+void AutomatableModelViewSlots::removeSongNearestAutomationNode()
+{
+	// getting the track without adding a new one if no track was found
+	AutomationTrack* track = getCurrentAutomationTrackForModel(false);
+
+	// this needs to be checked because getCurrentAutomationTrack might give
+	// a nullptr if it can not find and add a track
+	if (!track) { return; }
+
+	AutomationNodeAtTimePos nodeClip = getNearestAutomationNode(track);
+	if (nodeClip.m_clip)
+	{
+		nodeClip.m_clip->removeNode(nodeClip.m_position);
+		// if there is no node left, the automationClip will be deleted
+		if (nodeClip.m_clip->hasAutomation() == false)
+		{
+			// this is safe because clips remove themself from tracks
+			delete nodeClip.m_clip;
+		}
+	}
+}
+
+AutomationTrack* AutomatableModelViewSlots::getCurrentAutomationTrack(std::vector<AutomationClip*>* clips, bool canAddNewTrack)
+{
+	AutomationTrack* output = nullptr;
+	if (clips->size() > 0)
+	{
+		// selecting the track with the most amount of clips
+		// connected to this model
+
+		// track*, how many clips are on that track (that are connected to this model)
+		std::list<std::pair<AutomationTrack*, size_t>> trackList;
+		for (size_t i = 0; i < clips->size(); i++)
+		{
+			bool found = false;
+			// search this track inside the existing tracks
+			for (std::pair<AutomationTrack*, size_t>& j : trackList)
+			{
+				// if the track already is in trackList
+				if (j.first == (*clips)[i]->getTrack())
+				{
+					found = true;
+					j.second++;
+					break;
+				}
+			}
+			if (!found)
+			{
+				trackList.push_back(std::make_pair(dynamic_cast<AutomationTrack*>((*clips)[i]->getTrack()), 1));
+			}
+		}
+
+		size_t matchedModelCount = 0;
+		AutomationTrack* matchedTrack = nullptr;
+		// find a track where all clips are all connected to this model
+		for (std::pair<AutomationTrack*, size_t>& j : trackList)
+		{
+			// if all clips on that track are connected to this model
+			bool isOnlyThatModel = static_cast<size_t>(j.first->numOfClips()) == j.second;
+			if (matchedModelCount < j.second && isOnlyThatModel)
+			{
+				matchedTrack = j.first;
+				matchedModelCount = j.second;
+			}
+		}
+
+		output = matchedTrack;
+	}
+	if (canAddNewTrack && output == nullptr)
+	{
+		// adding new track
+		output = new AutomationTrack(getGUI()->songEditor()->m_editor->model(), false);
+		output->setName(m_amv->modelUntyped()->displayName() + " " + tr("automation"));
+	}
+	return output;
+}
+
+AutomationClip* AutomatableModelViewSlots::getCurrentAutomationClip(AutomationTrack* track, bool canAddNewClip, bool searchAfter)
+{
+	AutomationClip* output = nullptr;
+	const std::vector<Clip*>& trackClips = track->getClips();
+	TimePos timePos = getCurrentPlayingPosition();
+	
+	bool tryAdding = false;
+	if (trackClips.size() > 0)
+	{
+		// getting the closest clip that start before or after the global time position
+		tick_t closestTime = -1;
+		Clip* closestClip = nullptr;
+		for (Clip* currentClip : trackClips)
+		{
+			tick_t currentTime = currentClip->startPosition().getTicks();
+			bool smallerCheck = currentTime > closestTime || closestTime < 0;
+			bool biggerCheck = currentTime < closestTime || closestTime < 0;
+			bool searchBeforeCheck = !searchAfter && smallerCheck && timePos.getTicks() > currentTime;
+			bool searchAfterCheck = searchAfter && biggerCheck && timePos.getTicks() <= currentTime;
+
+			if (searchBeforeCheck || searchAfterCheck)
+			{
+				closestTime = currentTime;
+				closestClip = currentClip;
+			}
+		}
+
+		// in some cases there could be no clips before or after the global time position
+		// if this is the case, try adding a new one
+		// (if this fails, return nullptr)
+		if (!closestClip)
+		{
+			tryAdding = true;
+		}
+		else
+		{
+			output = dynamic_cast<AutomationClip*>(closestClip);
+		}
+	}
+	else
+	{
+		tryAdding = true;
+	}
+	if (tryAdding && canAddNewClip)
+	{
+		// adding a new clip
+		output = makeNewClip(track, timePos, true);
+	}
+	return output;
+}
+
+const AutomatableModelViewSlots::AutomationNodeAtTimePos AutomatableModelViewSlots::getNearestAutomationNode(AutomationTrack* track)
+{
+	AutomationNodeAtTimePos output;
+	output.m_clip = nullptr;
+	int minDistance = -1;
+
+	TimePos timePos = getCurrentPlayingPosition();
+	// getting the clips before and after the global time position
+	AutomationClip* clipBefore = getCurrentAutomationClip(track, false, false);
+	AutomationClip* clipAfter = getCurrentAutomationClip(track, false, true);
+
+	if (clipBefore && clipBefore->hasAutomation())
+	{
+		// getting nearest node
+		// in the clip that starts before this
+		for (auto it = clipBefore->getTimeMap().begin(); it != clipBefore->getTimeMap().end(); ++it)
+		{
+			int curDistance = std::abs(static_cast<int>(POS(it) + clipBefore->startPosition().getTicks()) - static_cast<int>(timePos.getTicks()));
+			if (curDistance < minDistance || minDistance < 0)
+			{
+				minDistance = curDistance;
+				output.m_position = TimePos(POS(it));
+				output.m_clip = clipBefore;
+			}
+		}
+	}
+	if (clipAfter && clipAfter->hasAutomation())
+	{
+		// getting the nearest node
+		// in the clip that starts after this
+		int curDistance = static_cast<int>(POS(clipAfter->getTimeMap().begin()) + clipAfter->startPosition().getTicks()) - static_cast<int>(timePos.getTicks());
+		if (curDistance < minDistance || minDistance < 0)
+		{
+			minDistance = curDistance;
+			output.m_position = TimePos(POS(clipAfter->getTimeMap().begin()));
+			output.m_clip = clipAfter;
+		}
+	}
+
+	return output;
+}
+
+AutomationClip* AutomatableModelViewSlots::makeNewClip(AutomationTrack* track, TimePos position, bool canSnap)
+{
+	if (canSnap)
+	{
+		// snapping to the bar before
+		position.setTicks(position.getTicks() - position.getTickWithinBar(TimeSig(Engine::getSong()->getTimeSigModel())));
+	}
+	AutomationClip* output = dynamic_cast<AutomationClip*>(track->createClip(position));
+	// connect to model
+	output->addObject(m_amv->modelUntyped(), true);
+	return output;
+}
+
+AutomationTrack* AutomatableModelViewSlots::getCurrentAutomationTrackForModel(bool canAddNewTrack)
+{
+	// getting all the clips that have this model
+	std::vector<AutomationClip*> clips = AutomationClip::clipsForModel(m_amv->modelUntyped());
+	// getting the track that has the most clips connected to this model
+	return getCurrentAutomationTrack(&clips, canAddNewTrack);
+}
+
+TimePos AutomatableModelViewSlots::getCurrentPlayingPosition()
+{
+	return static_cast<TimePos>(Engine::getSong()->getPlayPos());
+}
 
 void AutomatableModelViewSlots::editSongGlobalAutomation()
 {
