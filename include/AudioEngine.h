@@ -339,6 +339,8 @@ private:
 	void startProcessing(bool needsFifo = true);
 	void stopProcessing();
 
+	void startExporting(const struct qualitySettings& qs);
+
 
 	AudioDevice * tryAudioDevices();
 	MidiClient * tryMidiClients();
@@ -410,7 +412,7 @@ private:
 
 	friend class Engine;
 	friend class AudioEngineWorkerThread;
-	friend class ProjectRenderer;
+	friend class RenderManager;
 } ;
 
 } // namespace lmms

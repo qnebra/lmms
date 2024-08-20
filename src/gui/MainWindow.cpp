@@ -1464,7 +1464,7 @@ void MainWindow::exportProject(bool multiExport)
 		efd.setFileMode( FileDialog::AnyFile );
 		int idx = 0;
 		QStringList types;
-		while( ProjectRenderer::fileEncodeDevices[idx].m_fileFormat != ProjectRenderer::ExportFileFormat::Count)
+		while(ProjectRenderer::fileEncodeDevices[idx].m_fileFormat != ProjectRenderer::ExportFileFormat::Count)
 		{
 			if(ProjectRenderer::fileEncodeDevices[idx].isAvailable()) {
 				types << tr(ProjectRenderer::fileEncodeDevices[idx].m_description);
@@ -1483,7 +1483,7 @@ void MainWindow::exportProject(bool multiExport)
 			efd.setDirectory( ConfigManager::inst()->userProjectsDir() );
 			baseFilename = tr( "untitled" );
 		}
-		efd.selectFile( baseFilename + ProjectRenderer::fileEncodeDevices[0].m_extension );
+		efd.selectFile(baseFilename + ProjectRenderer::fileEncodeDevices[0].m_extension);
 		efd.setWindowTitle( tr( "Select file for project-export..." ) );
 	}
 

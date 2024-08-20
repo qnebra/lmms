@@ -32,17 +32,15 @@
 namespace lmms
 {
 
-AudioFileDevice::AudioFileDevice( OutputSettings const & outputSettings,
-					const ch_cnt_t _channels,
-					const QString & _file,
-					AudioEngine*  _audioEngine ) :
-	AudioDevice( _channels, _audioEngine ),
+AudioFileDevice::AudioFileDevice(OutputSettings const & outputSettings,
+	const QString & _file, const ch_cnt_t _channels,
+	const fpp_t defaultBufferSize) :
 	m_outputFile( _file ),
-	m_outputSettings(outputSettings)
+	m_outputSettings(outputSettings),
+	m_defaultFrameCount(defaultBufferSize),
+	m_channelCount(_channels)
 {
 	using gui::ExportProjectDialog;
-
-	setSampleRate( outputSettings.getSampleRate() );
 
 	if( m_outputFile.open( QFile::WriteOnly | QFile::Truncate ) == false )
 	{
@@ -78,7 +76,30 @@ AudioFileDevice::~AudioFileDevice()
 	m_outputFile.close();
 }
 
+sample_rate_t AudioFileDevice::getSampleRate()
+{
+	return m_outputSettings.getSampleRate();
+}
 
+ch_cnt_t AudioFileDevice::getChannel()
+{
+	return m_channelCount;
+}
+
+const fpp_t AudioFileDevice::getDefaultFrameCount()
+{
+	return m_defaultFrameCount;
+}
+
+void AudioFileDevice::setSampleRate(sample_rate_t newSampleRate)
+{
+	 m_outputSettings.setSampleRate(newSampleRate);
+}
+
+void AudioFileDevice::processThisBuffer(SampleFrame* frameBuffer, const fpp_t frameCount)
+{
+    writeBuffer(frameBuffer, frameCount);
+}
 
 
 int AudioFileDevice::writeData( const void* data, int len )
