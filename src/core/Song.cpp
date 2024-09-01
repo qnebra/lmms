@@ -270,6 +270,8 @@ void Song::processNextBuffer()
 	const auto framesPerTick = Engine::framesPerTick();
 	const auto framesPerPeriod = Engine::audioEngine()->framesPerPeriod();
 
+	m_metronome.process(framesPerPeriod);
+
 	f_cnt_t frameOffsetInPeriod = 0;
 
 	while (frameOffsetInPeriod < framesPerPeriod)
@@ -1546,5 +1548,9 @@ void Song::setKeymap(unsigned int index, std::shared_ptr<Keymap> newMap)
 	Engine::audioEngine()->doneChangeInModel();
 }
 
+Metronome& Song::metronome()
+{
+	return m_metronome;
+}
 
 } // namespace lmms
