@@ -675,4 +675,55 @@ void MidiClipView::paintEvent( QPaintEvent * )
 }
 
 
+//! Split this Clip.
+/*! \param pos the position of the split, relative to the start of the clip */
+bool MidiClipView::splitClip(const TimePos pos)
+{
+	// Currently, due to midi clips being required to be multiples of 1 bar in length, restrict the split pos to the nearest bar:
+	const TimePos rounded_pos = (pos + TimePos::ticksPerBar() / 2) - (pos + TimePos::ticksPerBar() / 2) % TimePos::ticksPerBar();
+	setMarkerEnabled( false );
+
+	const TimePos splitPos = m_initialClipPos + rounded_pos;
+
+	//Don't split if we slid off the Clip or if we're on the clip's start/end
+	//Cutting at exactly the start/end position would create a zero length
+	//clip (bad), and a clip the same length as the original one (pointless).
+	if (splitPos <= m_initialClipPos || splitPos >= m_initialClipEnd) {return false;}
+
+	m_clip->getTrack()->addJournalCheckPoint();
+	m_clip->getTrack()->saveJournallingState(false);
+
+	auto rightClip = new MidiClip(m_clip->instrumentTrack());
+	auto leftClip = new MidiClip(m_clip->instrumentTrack());
+	
+	for (Note const * note : m_clip->m_notes)
+	{
+		if (note->pos() >= rounded_pos)
+		{
+			Note *moved_note = new Note(*note);
+			moved_note->setPos(note->pos() - rounded_pos);
+			rightClip->addNote(*moved_note);
+		}
+	}
+
+	for (Note const * note : m_clip->m_notes)
+	{
+		if (note->pos() < rounded_pos)
+		{
+			leftClip->addNote(*note);
+		}
+	}
+
+	leftClip->changeLength(splitPos - m_initialClipPos);
+
+	rightClip->movePosition(splitPos);
+	rightClip->changeLength(m_initialClipEnd - splitPos);
+
+	m_clip->getTrack()->restoreJournallingState();
+	remove();
+	return true;
+}
+
+
+
 } // namespace lmms::gui
