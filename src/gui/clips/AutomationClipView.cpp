@@ -487,17 +487,19 @@ void AutomationClipView::scaleTimemapToFit( float oldMin, float oldMax )
 }
 
 //! Split this Clip.
-/*! \param pos the position of the split, relative to the start of the clip */
+/**
+	param pos the position of the split, relative to the start of the clip
+*/
 bool AutomationClipView::splitClip(const TimePos pos)
 {
 	setMarkerEnabled(false);
 
 	const TimePos splitPos = m_initialClipPos + pos;
 
-	//Don't split if we slid off the Clip or if we're on the clip's start/end
-	//Cutting at exactly the start/end position would create a zero length
-	//clip (bad), and a clip the same length as the original one (pointless).
-	if (splitPos <= m_initialClipPos || splitPos >= m_initialClipEnd) {return false;}
+	// Don't split if we slid off the Clip or if we're on the clip's start/end
+	// Cutting at exactly the start/end position would create a zero length
+	// clip (bad), and a clip the same length as the original one (pointless).
+	if (splitPos <= m_initialClipPos || splitPos >= m_initialClipEnd) { return false; }
 
 	m_clip->getTrack()->addJournalCheckPoint();
 	m_clip->getTrack()->saveJournallingState(false);
@@ -507,7 +509,7 @@ bool AutomationClipView::splitClip(const TimePos pos)
 	rightClip->clear();
 	leftClip->clear();
 
-	for(auto it = m_clip->getTimeMap().begin(); it != m_clip->getTimeMap().end(); ++it)
+	for (auto it = m_clip->getTimeMap().begin(); it != m_clip->getTimeMap().end(); ++it)
 	{
 		if (POS(it) >= pos)
 		{
