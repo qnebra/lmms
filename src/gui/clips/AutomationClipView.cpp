@@ -37,6 +37,8 @@
 #include "StringPairDrag.h"
 #include "TextFloat.h"
 #include "Track.h"
+#include "TrackContainerView.h"
+#include "TrackView.h"
 
 #include "Engine.h"
 
@@ -288,6 +290,8 @@ bool AutomationClipView::processPaste(const QMimeData* mimeData)
 
 void AutomationClipView::mouseDoubleClickEvent( QMouseEvent * me )
 {
+	if (m_trackView->trackContainerView()->knifeMode()) { return; }
+
 	if(me->button() != Qt::LeftButton)
 	{
 		me->ignore();
@@ -469,6 +473,11 @@ void AutomationClipView::paintEvent( QPaintEvent * )
 		p.drawPixmap( spacing, height() - ( size + spacing ),
 			embed::getIconPixmap( "muted", size, size ) );
 	}
+	
+	if ( m_marker )
+	{
+		p.drawLine(m_markerPos, rect().bottom(), m_markerPos, rect().top());
+	}
 
 	drawAutoHighlight(&p);
 	p.end();
@@ -543,5 +552,52 @@ void AutomationClipView::scaleTimemapToFit( float oldMin, float oldMax )
 	m_clip->generateTangents();
 }
 
+
+
+
+bool AutomationClipView::splitClip(const TimePos pos)
+{
+	setMarkerEnabled(false);
+
+	const TimePos splitPos = m_initialClipPos + pos;
+
+	// Don't split if we slid off the Clip or if we're on the clip's start/end
+	// Cutting at exactly the start/end position would create a zero length
+	// clip (bad), and a clip the same length as the original one (pointless).
+	if (splitPos <= m_initialClipPos || splitPos >= m_initialClipEnd) { return false; }
+
+	m_clip->getTrack()->addJournalCheckPoint();
+	m_clip->getTrack()->saveJournallingState(false);
+
+	auto rightClip = new AutomationClip(*m_clip);
+	auto leftClip = new AutomationClip(*m_clip);
+
+	rightClip->clear();
+	leftClip->removeNodes(splitPos, m_initialClipEnd);
+
+	for (auto it = m_clip->getTimeMap().begin(); it != m_clip->getTimeMap().end(); ++it)
+	{
+		if (POS(it) >= pos)
+		{
+			rightClip->putValues(POS(it) - pos, INVAL(it), OUTVAL(it), false);
+		}
+	}
+	rightClip->putValue(0, m_clip->valueAt(pos));
+	leftClip->putValue(pos, m_clip->valueAt(pos));
+
+	leftClip->movePosition(m_initialClipPos);
+	leftClip->changeLength(splitPos - m_initialClipPos);
+
+	rightClip->movePosition(splitPos);
+	rightClip->changeLength(m_initialClipEnd - splitPos);
+
+	// For some reason, the new clips sometime randomly put themselves in record mode. This is a temportary fix which forces them to match the original clip.
+	rightClip->setRecording(m_clip->isRecording());
+	leftClip->setRecording(m_clip->isRecording());
+	
+	m_clip->getTrack()->restoreJournallingState();
+	close();
+	return true;
+}
 
 } // namespace lmms::gui

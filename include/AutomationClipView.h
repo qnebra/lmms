@@ -82,6 +82,7 @@ private:
 	
 	QStaticText m_staticTextName;
 	void scaleTimemapToFit( float oldMin, float oldMax );
+	bool splitClip(const TimePos pos) override;
 } ;
 
 
