@@ -85,12 +85,12 @@ private:
 	{
 		std::size_t operator()(const AudioFileEntry& entry) const noexcept
 		{
-			return std::hash<std::filesystem::path>{}(entry.path);
+			return std::hash<std::filesystem::path>()(entry.path);
 		}
 
 		std::size_t operator()(const Base64Entry& entry) const noexcept
 		{
-			return std::hash<std::string>{}(entry.base64);
+			return std::hash<std::string>()(entry.base64);
 		}
 	};
 
