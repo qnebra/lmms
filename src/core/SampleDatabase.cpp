@@ -43,7 +43,15 @@ auto SampleDatabase::fetch(const QString& path) -> std::shared_ptr<SampleBuffer>
 		return buffer;
 	}
 
-	return it->second.lock();
+	const auto entryLock = it->second.lock();
+	if (!entryLock)
+	{
+		const auto buffer = std::make_shared<SampleBuffer>(path);
+		s_audioFileMap[entry] = buffer;
+		return buffer;
+	}
+
+	return entryLock;
 }
 
 auto SampleDatabase::fetch(const QString& base64, int sampleRate) -> std::shared_ptr<SampleBuffer>
@@ -58,6 +66,14 @@ auto SampleDatabase::fetch(const QString& base64, int sampleRate) -> std::shared
 		return buffer;
 	}
 
-	return it->second.lock();
+	const auto entryLock = it->second.lock();
+	if (!entryLock)
+	{
+		const auto buffer = std::make_shared<SampleBuffer>(base64, sampleRate);
+		s_base64Map[entry] = buffer;
+		return buffer;
+	}
+
+	return entryLock;
 }
 } // namespace lmms
