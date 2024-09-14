@@ -40,16 +40,16 @@ public:
 		Fetches a sample from the database through a path to an audio file,
 		and returns the stored buffer.
 
-		If `path` exists in the database, its creation time and last write time
-		is checked with what is currently in the database. If there is a mismatch, the sample is reloaded from disk, its
-		entry in the database is updated, and the sample is returned.
+		If `path` exists in the database, its last write time is checked with what is currently in the database. If
+		there is a mismatch, the sample is reloaded from disk, its entry in the database is updated, and the sample is
+		returned.
 
 		If `path` does not exist in the database, the sample is loaded from disk and
 		then returned.
 
 		If `path` does not exist on disk, an empty buffer is returned.
 	 */
-	auto fetch(const QString& path) -> std::shared_ptr<SampleBuffer>;
+	static auto fetch(const std::filesystem::path& path) -> std::shared_ptr<SampleBuffer>;
 
 	/**
 		Fetches a sample from the database through a Base64 string and a sample rate
@@ -58,24 +58,46 @@ public:
 		If an entry for a `base64` string with a certain `sampleRate` exists in the database, the stored sample is
 		returned. Otherwise, if it does not exist in the database, the sample is loaded and then returned.
 	 */
-	auto fetch(const std::string& base64, int sampleRate) -> std::shared_ptr<SampleBuffer>;
+	static auto fetch(const std::string& base64, int sampleRate) -> std::shared_ptr<SampleBuffer>;
 
 private:
 	struct AudioFileEntry
 	{
+		friend bool operator==(const AudioFileEntry& first, const AudioFileEntry& second) noexcept
+		{
+			return first.path == second.path && first.lastWriteTime == second.lastWriteTime;
+		}
+
 		std::filesystem::path path;
-		std::filesystem::file_time_type creationTime;
 		std::filesystem::file_time_type lastWriteTime;
 	};
 
 	struct Base64Entry
 	{
+		friend bool operator==(const Base64Entry& first, const Base64Entry& second) noexcept
+		{
+			return first.base64 == second.base64 && first.sampleRate == second.sampleRate;
+		}
+
 		std::string base64;
 		int sampleRate;
 	};
 
-	std::unordered_map<AudioFileEntry, std::weak_ptr<SampleBuffer>> m_audioFileMap;
-	std::unordered_map<Base64Entry, std::weak_ptr<SampleBuffer>> m_base64Map;
+	struct Hash
+	{
+		std::size_t operator()(const AudioFileEntry& entry) const noexcept
+		{
+			return std::hash<std::filesystem::path>{}(entry.path);
+		}
+
+		std::size_t operator()(const Base64Entry& entry) const noexcept
+		{
+			return std::hash<std::string>{}(entry.base64);
+		}
+	};
+
+	inline static std::unordered_map<AudioFileEntry, std::weak_ptr<SampleBuffer>, Hash> s_audioFileMap;
+	inline static std::unordered_map<Base64Entry, std::weak_ptr<SampleBuffer>, Hash> s_base64Map;
 };
 } // namespace lmms
 
