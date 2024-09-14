@@ -94,6 +94,29 @@ private:
 		}
 	};
 
+	template <typename T, typename ...Args>
+	static auto get(const T& entry, std::unordered_map<T, std::weak_ptr<SampleBuffer>, Hash>& map, Args... args)
+	{
+		const auto it = map.find(entry);
+
+		if (it == map.end())
+		{
+			const auto buffer = std::make_shared<SampleBuffer>(std::forward<Args>(args)...);
+			map.insert(std::make_pair(entry, buffer));
+			return buffer;
+		}
+
+		const auto entryLock = it->second.lock();
+		if (!entryLock)
+		{
+			const auto buffer = std::make_shared<SampleBuffer>(std::forward<Args>(args)...);
+			map[entry] = buffer;
+			return buffer;
+		}
+
+		return entryLock;
+	}
+
 	inline static std::unordered_map<AudioFileEntry, std::weak_ptr<SampleBuffer>, Hash> s_audioFileMap;
 	inline static std::unordered_map<Base64Entry, std::weak_ptr<SampleBuffer>, Hash> s_base64Map;
 };
