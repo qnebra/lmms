@@ -30,14 +30,15 @@
 #include "SampleBuffer.h"
 
 namespace lmms {
-auto SampleDatabase::fetch(const std::filesystem::path& path) -> std::shared_ptr<SampleBuffer>
+auto SampleDatabase::fetch(const QString& path) -> std::shared_ptr<SampleBuffer>
 {
-	const auto entry = AudioFileEntry{path, std::filesystem::last_write_time(path)};
+	const auto fsPath = FileSystemHelpers::pathFromQString(path);
+	const auto entry = AudioFileEntry{fsPath, std::filesystem::last_write_time(fsPath)};
 	const auto it = s_audioFileMap.find(entry);
 
 	if (it == s_audioFileMap.end())
 	{
-		const auto buffer = std::make_shared<SampleBuffer>(FileSystemHelpers::qStringFromPath(path));
+		const auto buffer = std::make_shared<SampleBuffer>(path);
 		s_audioFileMap.insert(std::make_pair(entry, buffer));
 		return buffer;
 	}
@@ -45,14 +46,14 @@ auto SampleDatabase::fetch(const std::filesystem::path& path) -> std::shared_ptr
 	return it->second.lock();
 }
 
-auto SampleDatabase::fetch(const std::string& base64, int sampleRate) -> std::shared_ptr<SampleBuffer>
+auto SampleDatabase::fetch(const QString& base64, int sampleRate) -> std::shared_ptr<SampleBuffer>
 {
-	const auto entry = Base64Entry{base64, sampleRate};
+	const auto entry = Base64Entry{base64.toStdString(), sampleRate};
 	const auto it = s_base64Map.find(entry);
 
 	if (it == s_base64Map.end())
 	{
-		const auto buffer = std::make_shared<SampleBuffer>(QString::fromStdString(base64), sampleRate);
+		const auto buffer = std::make_shared<SampleBuffer>(base64, sampleRate);
 		s_base64Map.insert(std::make_pair(entry, buffer));
 		return buffer;
 	}

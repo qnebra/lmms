@@ -46,10 +46,8 @@ public:
 
 		If `path` does not exist in the database, the sample is loaded from disk and
 		then returned.
-
-		If `path` does not exist on disk, an empty buffer is returned.
 	 */
-	static auto fetch(const std::filesystem::path& path) -> std::shared_ptr<SampleBuffer>;
+	static auto fetch(const QString& path) -> std::shared_ptr<SampleBuffer>;
 
 	/**
 		Fetches a sample from the database through a Base64 string and a sample rate
@@ -58,7 +56,7 @@ public:
 		If an entry for a `base64` string with a certain `sampleRate` exists in the database, the stored sample is
 		returned. Otherwise, if it does not exist in the database, the sample is loaded and then returned.
 	 */
-	static auto fetch(const std::string& base64, int sampleRate) -> std::shared_ptr<SampleBuffer>;
+	static auto fetch(const QString& base64, int sampleRate) -> std::shared_ptr<SampleBuffer>;
 
 private:
 	struct AudioFileEntry
