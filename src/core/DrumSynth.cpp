@@ -408,10 +408,10 @@ int DrumSynth::GetDSFileSamples(QString dsfile, int16_t*& wave, int channels, sa
 	DGain = fastPow10f(0.05 * GetPrivateProfileFloat(sec, "Level", 0, dsfile));
 
 	MasterTune = GetPrivateProfileFloat(sec, "Tuning", 0.0, dsfile);
-	MasterTune = fastPow(1.0594631f, MasterTune + mem_tune);
+	MasterTune = std::pow(1.0594631f, MasterTune + mem_tune);
 	MainFilter = 2 * GetPrivateProfileInt(sec, "Filter", 0, dsfile);
 	MFres = 0.0101f * GetPrivateProfileFloat(sec, "Resonance", 0.0, dsfile);
-	MFres = fastPow(MFres, 0.5f);
+	MFres = std::sqrt(MFres);
 
 	HighPass = GetPrivateProfileInt(sec, "HighPass", 0, dsfile);
 	GetEnv(7, sec, "FilterEnv", dsfile);
@@ -484,7 +484,7 @@ int DrumSynth::GetDSFileSamples(QString dsfile, int16_t*& wave, int channels, sa
 	OW1 = GetPrivateProfileInt(sec, "Wave1", 0, dsfile);
 	OW2 = GetPrivateProfileInt(sec, "Wave2", 0, dsfile);
 	OBal2 = static_cast<float>(GetPrivateProfileInt(sec, "Param", 50, dsfile));
-	ODrive = fastPow(OBal2, 3.0f) / fastPow(50.0f, 3.0f);
+	ODrive = (OBal2 * OBal2 * OBal2) / 125000.0f;
 	OBal2 *= 0.01f;
 	OBal1 = 1.f - OBal2;
 	Ophi1 = Tphi;
@@ -558,7 +558,7 @@ int DrumSynth::GetDSFileSamples(QString dsfile, int16_t*& wave, int channels, sa
 	{
 		DAtten = DGain * static_cast<short>(LoudestEnv());
 		clippoint = DAtten > 32700 ? 32700 : static_cast<short>(DAtten);
-		DAtten = std::exp2f(2.0 * GetPrivateProfileInt(sec, "Bits", 0, dsfile));
+		DAtten = std::exp2(2.0 * GetPrivateProfileInt(sec, "Bits", 0, dsfile));
 		DGain = DAtten * DGain * fastPow10f(0.05 * GetPrivateProfileInt(sec, "Clipping", 0, dsfile));
 	}
 
