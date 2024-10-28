@@ -39,6 +39,7 @@
 #include "FifoBuffer.h"
 #include "AudioEngineProfiler.h"
 #include "PlayHandle.h"
+#include "AudioDevice.h"
 
 
 namespace lmms
