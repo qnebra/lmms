@@ -50,8 +50,11 @@
 #include "CaptionMenu.h"
 #include "embed.h"
 #include "Engine.h"
+#include "GuiApplication.h" // mainWindow()
+#include "gui_templates.h"
 #include "FontHelper.h"
 #include "InstrumentTrack.h"
+#include "MainWindow.h" // focusedInteractiveModelHandleKeyPress()
 #include "Song.h"
 #include "StringPairDrag.h"
 
@@ -110,7 +113,7 @@ PianoView::PianoView(QWidget *parent) :
 	connect( m_pianoScroll, SIGNAL(valueChanged(int)),
 			this, SLOT(pianoScrolled(int)));
 
-	// create a layout for ourselves
+	// create a layout for ourselvesr
 	auto layout = new QVBoxLayout(this);
 	layout->setSpacing( 0 );
 	layout->setContentsMargins(0, 0, 0, 0);
@@ -449,7 +452,7 @@ void PianoView::mousePressEvent(QMouseEvent *me)
 
 			if (me->modifiers() & Qt::ControlModifier)
 			{
-				new StringPairDrag("automatable_model",	QString::number(m_movedNoteModel->id()), QPixmap(), this);
+				new StringPairDrag(Clipboard::StringPairDataType::AutomatableModelLink, Clipboard::encodeAutomatableModelLink(*m_movedNoteModel), QPixmap(), this);
 				me->accept();
 			}
 			else
@@ -588,6 +591,10 @@ void PianoView::mouseMoveEvent( QMouseEvent * _me )
  */
 void PianoView::keyPressEvent( QKeyEvent * _ke )
 {
+	// focusing is wird, workaround PianoView's agressive focus and see if InteractiveModelView can accept it
+	bool accepted = getGUI()->mainWindow()->focusedInteractiveModelHandleKeyPress(_ke);
+	if (accepted) { return; }
+	
 	const int key_num = getKeyFromKeyEvent( _ke );
 
 	if( _ke->isAutoRepeat() == false && key_num > -1 )
@@ -647,7 +654,7 @@ void PianoView::focusOutEvent( QFocusEvent * )
 	{
 		return;
 	}
-
+	
 	// focus just switched to another control inside the instrument track
 	// window we live in?
 	if( parentWidget()->parentWidget()->focusWidget() != this &&
@@ -661,6 +668,7 @@ void PianoView::focusOutEvent( QFocusEvent * )
 		setFocus();
 		return;
 	}
+
 
 	// if we loose focus, we HAVE to note off all running notes because
 	// we don't receive key-release-events anymore and so the notes would
