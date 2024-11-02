@@ -52,6 +52,7 @@
 #include "Engine.h"
 #include "GuiApplication.h" // mainWindow()
 #include "FontHelper.h"
+#include "GuiApplication.h" // mainWindow()
 #include "InstrumentTrack.h"
 #include "MainWindow.h" // focusedInteractiveModelHandleKeyPress()
 #include "Song.h"
