@@ -51,7 +51,6 @@
 #include "embed.h"
 #include "Engine.h"
 #include "GuiApplication.h" // mainWindow()
-#include "gui_templates.h"
 #include "FontHelper.h"
 #include "InstrumentTrack.h"
 #include "MainWindow.h" // focusedInteractiveModelHandleKeyPress()
