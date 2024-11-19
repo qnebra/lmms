@@ -148,8 +148,8 @@ bool Granulator::addGrain( NotePlayHandle * _n, SampleFrame* _working_buffer, in
 
 	bool success2 = true;
 	// is a new grain coming up? If so, then add on the start of the next grain to the end of the buffer.
-	int frames_since_press = _n->totalFramesPlayed() + grain_offset;
-	int frames_until_new_grain = grain_size - (frames_since_press % grain_size);
+	f_cnt_t frames_since_press = _n->totalFramesPlayed() + grain_offset;
+	f_cnt_t frames_until_new_grain = grain_size - (frames_since_press % grain_size);
 	if (frames_until_new_grain<frames) {
 		// Time to pick new grain
 		// Set the direction based on the direction probability
@@ -238,7 +238,7 @@ void Granulator::playNote( NotePlayHandle * _n,
 		int num_grains = m_numGrainsModel.value();
 		for (int g = 0; g < num_grains; g++)
 		{
-			SampleFrame* temporary_buffer = new SampleFrame[Engine::audioEngine()->framesPerPeriod()];
+			SampleFrame* temporary_buffer = new SampleFrame[256];
 			// Make every other grain be panned left vs right. Perhaps not the best way to do it, but for even number of grains it should work well.
 			float panning = g%2==0 ? m_widthModel.value()/100 : -m_widthModel.value()/100;
 			success = success && addGrain(_n, temporary_buffer, g, grain_size, static_cast<float>(g)/num_grains * grain_size, panning);
@@ -378,7 +378,7 @@ QString Granulator::nodeName() const
 
 
 
-auto Granulator::beatLen(NotePlayHandle* note) const -> int
+auto Granulator::beatLen(NotePlayHandle* note) const -> f_cnt_t
 {
 	// If we can play indefinitely, use the default beat note duration
 	if (static_cast<Sample::Loop>(m_loopModel.value()) != Sample::Loop::Off) { return 0; }

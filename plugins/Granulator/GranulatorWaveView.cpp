@@ -25,7 +25,7 @@
 #include "GranulatorWaveView.h"
 
 #include "ConfigManager.h"
-#include "gui_templates.h"
+#include "FontHelper.h"
 #include "SampleWaveform.h"
 
 #include <QPainter>
@@ -52,12 +52,12 @@ void GranulatorWaveView::updateSampleRange()
 	}
 }
 
-void GranulatorWaveView::setTo(f_cnt_t to)
+void GranulatorWaveView::setTo(int to)
 {
-	m_to = std::min(to, static_cast<lmms::f_cnt_t>(m_sample->sampleSize()));
+	m_to = std::min(to, static_cast<int>(m_sample->sampleSize()));
 }
 
-void GranulatorWaveView::setFrom(f_cnt_t from)
+void GranulatorWaveView::setFrom(int from)
 {
 	m_from = std::max(from, 0);
 }
@@ -349,19 +349,19 @@ void GranulatorWaveView::zoom(const bool out)
 	const f_cnt_t d_from = start - m_from;
 	const f_cnt_t d_to = m_to - end;
 
-	const f_cnt_t step = qMax(1, qMax(d_from, d_to) / 10);
+	const f_cnt_t step = qMax(1.0, qMax(d_from, d_to) / 10.0);
 	const f_cnt_t step_from = (out ? - step : step);
 	const f_cnt_t step_to = (out ? step : - step);
 
 	const double comp_ratio = double(qMin(d_from, d_to))
-								/ qMax(1, qMax(d_from, d_to));
+								/ qMax(1, static_cast<int>(qMax(d_from, d_to)));
 
-	const auto boundedFrom = std::clamp(m_from + step_from, 0, start);
-	const auto boundedTo = std::clamp(m_to + step_to, end, frames);
+	const auto boundedFrom = std::clamp(static_cast<double>(m_from + step_from), 0.0, static_cast<double>(start));
+	const auto boundedTo = std::clamp(static_cast<double>(m_to + step_to), static_cast<double>(end), static_cast<double>(frames));
 
 	const auto toStep = static_cast<f_cnt_t>(step_from * (boundedTo == m_to ? 1 : comp_ratio));
 	const auto newFrom
-		= (out && d_from < d_to) || (!out && d_to < d_from) ? boundedFrom : std::clamp(m_from + toStep, 0, start);
+		= (out && d_from < d_to) || (!out && d_to < d_from) ? boundedFrom : std::clamp(static_cast<int>(m_from + toStep), 0, static_cast<int>(start));
 
 	const auto fromStep = static_cast<f_cnt_t>(step_to * (boundedFrom == m_from ? 1 : comp_ratio));
 	const auto newTo

@@ -152,8 +152,8 @@ public:
 
 	void updateSampleRange();
 private:
-	void setTo(f_cnt_t to);
-	void setFrom(f_cnt_t from);
+	void setTo(int to);
+	void setFrom(int from);
 	f_cnt_t range() const;
 	void zoom(const bool out = false);
 	void slide(int px);
