@@ -198,6 +198,8 @@ public:
 	
 	BoolModel* getMutedModel();
 
+	//! returns a name that isn't used by any track and conatins `sourceName`
+	QString findUniqueName(const QString& sourceName) const;
 public slots:
 	virtual void setName(const QString& newName);
 
@@ -211,6 +213,9 @@ public slots:
 private:
 	void saveTrack(QDomDocument& doc, QDomElement& element, bool presetMode);
 	void loadTrack(const QDomElement& element, bool presetMode);
+
+	//! returns the number characters at the end of a string
+	static QString getNameNumberEnding(const QString& name, bool* isSeparatedWithWhiteSpace = nullptr);
 
 private:
 	TrackContainer* m_trackContainer;
