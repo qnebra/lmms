@@ -50,8 +50,7 @@ namespace lmms
  *  The track object is the whole track, linking its contents, its
  *  automation, name, type, and so forth.
  *
- * \param type The type of track (Song Editor or Pattern Editor)
- * \param tc The track Container object to encapsulate in this track.
+ * \param trackContainer The track Container object to encapsulate in this track.
  *
  * \todo check the definitions of all the properties - are they OK?
  */
