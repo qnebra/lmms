@@ -341,7 +341,7 @@ bool MidiImport::readSMF( TrackContainer* tc )
 	auto timeSigDenominatorPat = new AutomationClip(dt);
 	timeSigDenominatorPat->setDisplayName(tr("Denominator"));
 	timeSigDenominatorPat->addObject(&timeSigMM.denominatorModel());
-	dt->addClip(timeSigNumeratorPat);
+	dt->addClip(timeSigDenominatorPat);
 
 	// TODO: adjust these to Time.Sig changes
 	double beatsPerBar = 4;
