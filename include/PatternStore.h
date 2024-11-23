@@ -71,8 +71,6 @@ public:
 
 	virtual bool play(TimePos start, const fpp_t frames, const f_cnt_t frameBase, int clipNum = -1);
 
-	void updateAfterTrackAdd() override;
-
 	inline QString nodeName() const override
 	{
 		return "patternstore";
@@ -102,6 +100,9 @@ public slots:
 
 
 private:
+	void onTrackAddedToPatternStore(Track* track);
+	void onTrackAddedToSongEditor(Track* track);
+
 	ComboBoxModel m_patternComboBoxModel;
 
 

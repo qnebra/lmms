@@ -45,12 +45,13 @@ MidiClip::MidiClip( InstrumentTrack * _instrument_track ) :
 	m_clipType( Type::BeatClip ),
 	m_steps( TimePos::stepsPerBar() )
 {
-	if (_instrument_track->trackContainer()	== Engine::patternStore())
-	{
-		resizeToFirstTrack();
-	}
 	init();
 	setAutoResize( true );
+
+	connect(_instrument_track, &Track::clipAdded, this, [this, _instrument_track](Clip* clip) {
+		if (clip != this || _instrument_track->trackContainer() != Engine::patternStore()) { return; }
+		resizeToFirstTrack();
+	});
 }
 
 

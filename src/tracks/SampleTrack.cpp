@@ -45,7 +45,7 @@ namespace lmms
 
 
 SampleTrack::SampleTrack(TrackContainer* tc) :
-	Track(Track::Type::Sample, tc),
+	Track(tc),
 	m_volumeModel(DefaultVolume, MinVolume, MaxVolume, 0.1f, this, tr("Volume")),
 	m_panningModel(DefaultPanning, PanningLeft, PanningRight, 0.1f, this, tr("Panning")),
 	m_mixerChannelModel(0, 0, 0, this, tr("Mixer channel")),
@@ -182,6 +182,7 @@ Clip * SampleTrack::createClip(const TimePos & pos)
 {
 	auto sClip = new SampleClip(this);
 	sClip->movePosition(pos);
+	addClip(sClip);
 	return sClip;
 }
 

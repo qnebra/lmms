@@ -39,9 +39,8 @@ namespace lmms
 
 PatternTrack::infoMap PatternTrack::s_infoMap;
 
-
-PatternTrack::PatternTrack(TrackContainer* tc) :
-	Track(Track::Type::Pattern, tc)
+PatternTrack::PatternTrack(TrackContainer* tc)
+	: Track(tc)
 {
 	int patternNum = s_infoMap.size();
 	s_infoMap[this] = patternNum;
@@ -148,6 +147,7 @@ Clip* PatternTrack::createClip(const TimePos & pos)
 {
 	auto pc = new PatternClip(this);
 	pc->movePosition(pos);
+	addClip(pc);
 	return pc;
 }
 

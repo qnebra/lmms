@@ -976,7 +976,6 @@ void Song::createNewProject()
 
 	m_loadingProject = false;
 	updateLength();
-	Engine::patternStore()->updateAfterTrackAdd();
 
 	Engine::projectJournal()->setJournalling( true );
 

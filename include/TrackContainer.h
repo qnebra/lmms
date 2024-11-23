@@ -69,8 +69,6 @@ public:
 	void addTrack( Track * _track );
 	void removeTrack( Track * _track );
 
-	virtual void updateAfterTrackAdd();
-
 	void clearAllTracks();
 
 	const TrackList & tracks() const

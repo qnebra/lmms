@@ -32,9 +32,9 @@
 namespace lmms
 {
 
-
-AutomationTrack::AutomationTrack( TrackContainer* tc, bool _hidden ) :
-	Track( _hidden ? Type::HiddenAutomation : Type::Automation, tc )
+AutomationTrack::AutomationTrack(TrackContainer* trackContainer, bool hidden)
+	: Track(trackContainer)
+	, m_hidden(hidden)
 {
 	setName(findUniqueName(tr("Automation track")));
 }
@@ -60,6 +60,7 @@ Clip* AutomationTrack::createClip(const TimePos & pos)
 {
 	auto p = new AutomationClip(this);
 	p->movePosition(pos);
+	addClip(p);
 	return p;
 }
 

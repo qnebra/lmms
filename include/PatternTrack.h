@@ -50,6 +50,8 @@ class LMMS_EXPORT PatternTrack : public Track
 public:
 	PatternTrack(TrackContainer* tc);
 	~PatternTrack() override;
+	
+	Type type() const override { return Track::Type::Pattern; }
 
 	bool play( const TimePos & _start, const fpp_t _frames,
 

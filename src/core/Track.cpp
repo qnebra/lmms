@@ -37,7 +37,6 @@
 #include "ConfigManager.h"
 #include "Engine.h"
 #include "InstrumentTrack.h"
-#include "PatternStore.h"
 #include "PatternTrack.h"
 #include "SampleTrack.h"
 #include "Song.h"
@@ -51,22 +50,17 @@ namespace lmms
  *  The track object is the whole track, linking its contents, its
  *  automation, name, type, and so forth.
  *
- * \param type The type of track (Song Editor or Pattern Editor)
- * \param tc The track Container object to encapsulate in this track.
+ * \param trackContainer The track Container object to encapsulate in this track.
  *
  * \todo check the definitions of all the properties - are they OK?
  */
-Track::Track( Type type, TrackContainer * tc ) :
-	Model( tc ),                   /*!< The track Model */
-	m_trackContainer( tc ),        /*!< The track container object */
-	m_type( type ),                /*!< The track type */
-	m_name(),                       /*!< The track's name */
-	m_mutedModel( false, this, tr( "Mute" ) ), /*!< For controlling track muting */
-	m_soloModel( false, this, tr( "Solo" ) ), /*!< For controlling track soloing */
-	m_clips()        /*!< The clips (segments) */
+Track::Track(TrackContainer* trackContainer)
+	: Model(trackContainer)
+	, m_trackContainer(trackContainer)
+	, m_height(-1)
+	, m_mutedModel(false, this, tr("Mute"))
+	, m_soloModel(false, this, tr("Solo"))
 {	
-	m_trackContainer->addTrack( this );
-	m_height = -1;
 }
 
 
@@ -78,16 +72,12 @@ Track::Track( Type type, TrackContainer * tc ) :
  */
 Track::~Track()
 {
-	lock();
-	emit destroyedTrack();
-
 	while (!m_clips.empty())
 	{
 		delete m_clips.back();
 	}
 
-	m_trackContainer->removeTrack( this );
-	unlock();
+	if (m_trackContainer) { m_trackContainer->removeTrack(this); }
 }
 
 
@@ -98,35 +88,34 @@ Track::~Track()
  *  \param tt The type of track to create
  *  \param tc The track container to attach to
  */
-Track * Track::create( Type tt, TrackContainer * tc )
+Track* Track::create(Type type, TrackContainer* trackContainer)
 {
-	Engine::audioEngine()->requestChangeInModel();
-
-	Track * t = nullptr;
-
-	switch( tt )
+	auto track = static_cast<Track*>(nullptr);
+	switch (type)
 	{
-		case Type::Instrument: t = new class InstrumentTrack( tc ); break;
-		case Type::Pattern: t = new class PatternTrack( tc ); break;
-		case Type::Sample: t = new class SampleTrack( tc ); break;
-//		case Type::Event:
-//		case Type::Video:
-		case Type::Automation: t = new class AutomationTrack( tc ); break;
-		case Type::HiddenAutomation:
-						t = new class AutomationTrack( tc, true ); break;
-		default: break;
+	case Type::Instrument:
+		track = new InstrumentTrack(trackContainer);
+		break;
+	case Type::Pattern:
+		track = new PatternTrack(trackContainer);
+		break;
+	case Type::Sample:
+		track = new SampleTrack(trackContainer);
+		break;
+	case Type::Automation:
+		[[fallthrough]];
+	case Type::HiddenAutomation:
+		track = new AutomationTrack(trackContainer, type == Type::HiddenAutomation);
+		break;
+	default:
+		break;
 	}
 
-	if (tc == Engine::patternStore() && t)
-	{
-		t->createClipsForPattern(Engine::patternStore()->numOfPatterns() - 1);
-	}
+	assert(track && "Track::create failed");
 
-	tc->updateAfterTrackAdd();
-
-	Engine::audioEngine()->doneChangeInModel();
-
-	return t;
+	const auto guard = Engine::audioEngine()->requestChangesGuard();
+	trackContainer->addTrack(track);
+	return track;
 }
 
 

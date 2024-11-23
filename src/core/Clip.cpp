@@ -50,10 +50,6 @@ Clip::Clip( Track * track ) :
 	m_mutedModel( false, this, tr( "Mute" ) ),
 	m_selectViewOnCreate{false}
 {
-	if( getTrack() )
-	{
-		getTrack()->addClip( this );
-	}
 	setJournalling( false );
 	movePosition( 0 );
 	changeLength( 0 );
@@ -70,12 +66,7 @@ Clip::Clip( Track * track ) :
  */
 Clip::~Clip()
 {
-	emit destroyedClip();
-
-	if( getTrack() )
-	{
-		getTrack()->removeClip( this );
-	}
+	if (m_track) { m_track->removeClip(this); }
 }
 
 
