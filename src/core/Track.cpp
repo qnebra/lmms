@@ -59,12 +59,10 @@ namespace lmms
 Track::Track(TrackContainer* trackContainer)
 	: Model(trackContainer)
 	, m_trackContainer(trackContainer)
-	, m_name()
+	, m_height(-1)
 	, m_mutedModel(false, this, tr("Mute"))
 	, m_soloModel(false, this, tr("Solo"))
-	, m_clips()
 {	
-	m_height = -1;
 }
 
 
