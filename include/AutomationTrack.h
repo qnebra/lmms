@@ -36,7 +36,7 @@ class AutomationTrack : public Track
 {
 	Q_OBJECT
 public:
-	AutomationTrack(TrackContainer* tc, bool hidden = false);
+	AutomationTrack( TrackContainer* tc, bool _hidden = false );
 	~AutomationTrack() override = default;
 
 	Type type() const override { return m_hidden ? Type::HiddenAutomation : Type::Automation; }
