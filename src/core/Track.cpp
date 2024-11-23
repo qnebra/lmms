@@ -73,16 +73,13 @@ Track::Track(TrackContainer* trackContainer)
  */
 Track::~Track()
 {
-	lock();
-	emit destroyedTrack();
-
 	while (!m_clips.empty())
 	{
 		delete m_clips.back();
 	}
 
-	m_trackContainer->removeTrack( this );
-	unlock();
+	emit destroyedTrack();
+	m_trackContainer->removeTrack(this);
 }
 
 
