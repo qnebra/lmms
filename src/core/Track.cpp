@@ -104,6 +104,7 @@ Track* Track::create(Type type, TrackContainer* trackContainer)
 		track = new SampleTrack(trackContainer);
 		break;
 	case Type::Automation:
+		[[fallthrough]];
 	case Type::HiddenAutomation:
 		track = new AutomationTrack(trackContainer, type == Type::HiddenAutomation);
 		break;
