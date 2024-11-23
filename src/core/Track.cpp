@@ -113,11 +113,8 @@ Track* Track::create(Type type, TrackContainer* trackContainer)
 
 	assert(track && "Track::create failed");
 
-	{
-		const auto guard = Engine::audioEngine()->requestChangesGuard();
-		trackContainer->addTrack(track);
-	}
-
+	const auto guard = Engine::audioEngine()->requestChangesGuard();
+	trackContainer->addTrack(track);
 	return track;
 }
 
