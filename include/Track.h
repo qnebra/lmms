@@ -84,7 +84,7 @@ public:
 		Count
 	} ;
 
-	Track( Type type, TrackContainer * tc );
+	Track(TrackContainer* trackContainer);
 	~Track() override;
 
 	static Track * create( Type tt, TrackContainer * tc );
@@ -92,12 +92,7 @@ public:
 							TrackContainer * tc );
 	Track * clone();
 
-
-	// pure virtual functions
-	Type type() const
-	{
-		return m_type;
-	}
+	virtual Type type() const = 0;
 
 	virtual bool play( const TimePos & start, const fpp_t frames,
 						const f_cnt_t frameBase, int clipNum = -1 ) = 0;
@@ -213,7 +208,6 @@ private:
 
 private:
 	TrackContainer* m_trackContainer;
-	Type m_type;
 	QString m_name;
 	int m_height;
 

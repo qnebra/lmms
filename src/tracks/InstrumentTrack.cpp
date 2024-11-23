@@ -47,7 +47,7 @@ namespace lmms
 
 
 InstrumentTrack::InstrumentTrack( TrackContainer* tc ) :
-	Track( Track::Type::Instrument, tc ),
+	Track(tc),
 	MidiEventProcessor(),
 	m_midiPort( tr( "unnamed_track" ), Engine::audioEngine()->midiClient(),
 								this, this ),

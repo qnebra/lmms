@@ -39,9 +39,8 @@ namespace lmms
 
 PatternTrack::infoMap PatternTrack::s_infoMap;
 
-
-PatternTrack::PatternTrack(TrackContainer* tc) :
-	Track(Track::Type::Pattern, tc)
+PatternTrack::PatternTrack(TrackContainer* tc)
+	: Track(tc)
 {
 	int patternNum = s_infoMap.size();
 	s_infoMap[this] = patternNum;

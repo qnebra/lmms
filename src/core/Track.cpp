@@ -56,15 +56,14 @@ namespace lmms
  *
  * \todo check the definitions of all the properties - are they OK?
  */
-Track::Track( Type type, TrackContainer * tc ) :
-	Model( tc ),                   /*!< The track Model */
-	m_trackContainer( tc ),        /*!< The track container object */
-	m_type( type ),                /*!< The track type */
-	m_name(),                       /*!< The track's name */
-	m_mutedModel( false, this, tr( "Mute" ) ), /*!< For controlling track muting */
-	m_soloModel( false, this, tr( "Solo" ) ), /*!< For controlling track soloing */
-	m_clips()        /*!< The clips (segments) */
-{
+Track::Track(TrackContainer* trackContainer)
+	: Model(trackContainer)
+	, m_trackContainer(trackContainer)
+	, m_name()
+	, m_mutedModel(false, this, tr("Mute"))
+	, m_soloModel(false, this, tr("Solo"))
+	, m_clips()
+{	
 	m_height = -1;
 }
 
@@ -120,7 +119,12 @@ Track* Track::create(Type type, TrackContainer* trackContainer)
 	}
 
 	assert(track && "Track::create failed");
-	trackContainer->addTrack(track);
+
+	{
+		const auto guard = Engine::audioEngine()->requestChangesGuard();
+		trackContainer->addTrack(track);
+	}
+
 	return track;
 }
 

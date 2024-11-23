@@ -36,8 +36,10 @@ class AutomationTrack : public Track
 {
 	Q_OBJECT
 public:
-	AutomationTrack( TrackContainer* tc, bool _hidden = false );
+	AutomationTrack(TrackContainer* tc, bool hidden = false);
 	~AutomationTrack() override = default;
+
+	Type type() const override { return m_hidden ? Type::HiddenAutomation : Type::Automation; }
 
 	bool play( const TimePos & _start, const fpp_t _frames,
 						const f_cnt_t _frame_base, int _clip_num = -1 ) override;
@@ -55,7 +57,7 @@ public:
 
 private:
 	friend class AutomationTrackView;
-
+	bool m_hidden = false;
 } ;
 
 

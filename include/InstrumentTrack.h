@@ -67,6 +67,8 @@ public:
 	InstrumentTrack( TrackContainer* tc );
 	~InstrumentTrack() override;
 
+	Type type() const override { return Track::Type::Instrument; }
+
 	// used by instrument
 	void processAudioBuffer( SampleFrame* _buf, const fpp_t _frames,
 							NotePlayHandle * _n );

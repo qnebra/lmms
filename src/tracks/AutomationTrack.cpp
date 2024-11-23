@@ -32,9 +32,9 @@
 namespace lmms
 {
 
-
-AutomationTrack::AutomationTrack( TrackContainer* tc, bool _hidden ) :
-	Track( _hidden ? Type::HiddenAutomation : Type::Automation, tc )
+AutomationTrack::AutomationTrack(TrackContainer* trackContainer, bool hidden)
+	: Track(trackContainer)
+	, m_hidden(hidden)
 {
 	setName( tr( "Automation track" ) );
 }
