@@ -37,7 +37,6 @@
 #include "ConfigManager.h"
 #include "Engine.h"
 #include "InstrumentTrack.h"
-#include "PatternStore.h"
 #include "PatternTrack.h"
 #include "SampleTrack.h"
 #include "Song.h"
