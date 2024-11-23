@@ -66,10 +66,7 @@ Clip::Clip( Track * track ) :
  */
 Clip::~Clip()
 {
-	if( getTrack() )
-	{
-		getTrack()->removeClip( this );
-	}
+	if (m_track) { m_track->removeClip(this); }
 }
 
 
