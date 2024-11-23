@@ -807,6 +807,7 @@ Clip* InstrumentTrack::createClip(const TimePos & pos)
 {
 	auto p = new MidiClip(this);
 	p->movePosition(pos);
+	addClip(p);
 	return p;
 }
 

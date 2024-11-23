@@ -60,6 +60,7 @@ Clip* AutomationTrack::createClip(const TimePos & pos)
 {
 	auto p = new AutomationClip(this);
 	p->movePosition(pos);
+	addClip(p);
 	return p;
 }
 
