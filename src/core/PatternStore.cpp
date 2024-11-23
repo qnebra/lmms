@@ -44,6 +44,8 @@ PatternStore::PatternStore() :
 	// not change upon setCurrentPattern()-call
 	connect(&m_patternComboBoxModel, SIGNAL(dataUnchanged()),
 			this, SLOT(currentPatternChanged()));
+	connect(this, &TrackContainer::trackAdded, this, &PatternStore::onTrackAddedToPatternStore);
+	connect(Engine::getSong(), &Song::trackAdded, this, &PatternStore::onTrackAddedToSongEditor);
 	setType(Type::Pattern);
 }
 
@@ -76,7 +78,7 @@ bool PatternStore::play(TimePos start, fpp_t frames, f_cnt_t offset, int clipNum
 
 
 
-void PatternStore::updateAfterTrackAdd()
+void PatternStore::onTrackAddedToPatternStore(Track* track)
 {
 	if (numOfPatterns() == 0 && !Engine::getSong()->isLoadingProject())
 	{
@@ -84,6 +86,15 @@ void PatternStore::updateAfterTrackAdd()
 	}
 }
 
+void PatternStore::onTrackAddedToSongEditor(Track* track)
+{
+	if (track->type() != Track::Type::Pattern) { return; }
+
+	const auto patternTrack = static_cast<PatternTrack*>(track);
+	createClipsForPattern(patternTrack->patternIndex());
+	setCurrentPattern(patternTrack->patternIndex());
+	updateComboBox();
+}
 
 
 

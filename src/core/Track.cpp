@@ -64,8 +64,7 @@ Track::Track( Type type, TrackContainer * tc ) :
 	m_mutedModel( false, this, tr( "Mute" ) ), /*!< For controlling track muting */
 	m_soloModel( false, this, tr( "Solo" ) ), /*!< For controlling track soloing */
 	m_clips()        /*!< The clips (segments) */
-{	
-	m_trackContainer->addTrack( this );
+{
 	m_height = -1;
 }
 
@@ -98,35 +97,31 @@ Track::~Track()
  *  \param tt The type of track to create
  *  \param tc The track container to attach to
  */
-Track * Track::create( Type tt, TrackContainer * tc )
+Track* Track::create(Type type, TrackContainer* trackContainer)
 {
-	Engine::audioEngine()->requestChangeInModel();
-
-	Track * t = nullptr;
-
-	switch( tt )
+	auto track = static_cast<Track*>(nullptr);
+	switch (type)
 	{
-		case Type::Instrument: t = new class InstrumentTrack( tc ); break;
-		case Type::Pattern: t = new class PatternTrack( tc ); break;
-		case Type::Sample: t = new class SampleTrack( tc ); break;
-//		case Type::Event:
-//		case Type::Video:
-		case Type::Automation: t = new class AutomationTrack( tc ); break;
-		case Type::HiddenAutomation:
-						t = new class AutomationTrack( tc, true ); break;
-		default: break;
+	case Type::Instrument:
+		track = new InstrumentTrack(trackContainer);
+		break;
+	case Type::Pattern:
+		track = new PatternTrack(trackContainer);
+		break;
+	case Type::Sample:
+		track = new SampleTrack(trackContainer);
+		break;
+	case Type::Automation:
+	case Type::HiddenAutomation:
+		track = new AutomationTrack(trackContainer, type == Type::HiddenAutomation);
+		break;
+	default:
+		break;
 	}
 
-	if (tc == Engine::patternStore() && t)
-	{
-		t->createClipsForPattern(Engine::patternStore()->numOfPatterns() - 1);
-	}
-
-	tc->updateAfterTrackAdd();
-
-	Engine::audioEngine()->doneChangeInModel();
-
-	return t;
+	assert(track && "Track::create failed");
+	trackContainer->addTrack(track);
+	return track;
 }
 
 
