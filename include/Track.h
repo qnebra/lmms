@@ -228,7 +228,6 @@ private:
 
 
 signals:
-	void destroyedTrack();
 	void nameChanged();
 	void clipAdded( lmms::Clip * );
 	void colorChanged();

@@ -78,7 +78,6 @@ Track::~Track()
 		delete m_clips.back();
 	}
 
-	emit destroyedTrack();
 	m_trackContainer->removeTrack(this);
 }
 
