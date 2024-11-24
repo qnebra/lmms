@@ -173,7 +173,7 @@ MixerView::MixerView(Mixer* mixer) :
 	layout()->setSizeConstraint(QLayout::SetMinimumSize);
 
 	// add ourself to workspace
-	QMdiSubWindow* subWin = mainWindow->addWindowedWidget(this);
+	QMdiSubWindow* SubWindow = mainWindow->addWindowedWidget(this);
 
 	parentWidget()->setAttribute(Qt::WA_DeleteOnClose, false);
 	parentWidget()->move(5, 310);
