@@ -317,6 +317,7 @@ void AutomatableModel::setValue( const float value )
 		}
 		m_valueChanged = true;
 		emit dataChanged();
+		emit setValueEvent();
 	}
 	else
 	{
