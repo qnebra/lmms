@@ -28,11 +28,8 @@
 #include "lmms_math.h"
 #include "embed.h"
 #include "interpolation.h"
-#include "VectorGraphModel.h"
 
 #include "plugin_export.h"
-
-#include <vector>
 
 namespace lmms
 {
@@ -78,9 +75,7 @@ Effect::ProcessStatus WaveShaperEffect::processImpl(SampleFrame* buf, const fpp_
 	const float w = wetLevel();
 	float input = m_wsControls.m_inputModel.value();
 	float output = m_wsControls.m_outputModel.value();
-	// getting the current graph samples (size: 200)
-	// getting the graph samples this often can cause lagg with bigger sample count (if automated or effected)
-	std::vector<float>* graphSamples = m_wsControls.getGraphSamples();
+	const float * samples = m_wsControls.m_wavegraphModel.samples();
 	const bool clip = m_wsControls.m_clipModel.value();
 
 	ValueBuffer *inputBuffer = m_wsControls.m_inputModel.valueBuffer();
@@ -117,17 +112,17 @@ Effect::ProcessStatus WaveShaperEffect::processImpl(SampleFrame* buf, const fpp_
 
 			if( lookup < 1 )
 			{
-				s[i] = frac * (*graphSamples)[0] * posneg;
+				s[i] = frac * samples[0] * posneg;
 			}
 			else if( lookup < 200 )
 			{
-				s[i] = linearInterpolate((*graphSamples)[lookup - 1],
-						(*graphSamples)[lookup], frac)
+				s[i] = linearInterpolate( samples[ lookup - 1 ],
+						samples[ lookup ], frac )
 						* posneg;
 			}
 			else
 			{
-				s[i] *= (*graphSamples)[199];
+				s[i] *= samples[199];
 			}
 		}
 
