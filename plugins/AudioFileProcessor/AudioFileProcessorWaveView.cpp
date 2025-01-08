@@ -342,12 +342,14 @@ void AudioFileProcessorWaveView::updateGraph()
 
 	m_sampleThumbnail = SampleThumbnail{*m_sample};
 
-	auto param = SampleThumbnail::VisualizeParameters{};
-	param.amplification = m_sample->amplification();
-	param.reversed = m_sample->reversed();
-	param.sampleStart = static_cast<float>(m_from) / m_sample->sampleSize();
-	param.sampleEnd = static_cast<float>(m_to) / m_sample->sampleSize();
-	param.sampleRect = m_graph.rect();
+	const auto param = SampleThumbnail::VisualizeParameters{
+		.sampleRect = m_graph.rect(),
+		.amplification = m_sample->amplification(),
+		.sampleStart = static_cast<float>(m_from) / m_sample->sampleSize(),
+		.sampleEnd = static_cast<float>(m_to) / m_sample->sampleSize(),
+		.reversed = m_sample->reversed(),
+	};
+
 	m_sampleThumbnail.visualize(param, p);
 }
 
