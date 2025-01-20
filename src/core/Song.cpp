@@ -297,7 +297,7 @@ void Song::processNextBuffer()
 			}
 			else if (m_playMode == PlayMode::MidiClip && m_loopMidiClip && !loopEnabled)
 			{
-				enforceLoop(TimePos{0}, m_midiClipToPlay->length());
+				enforceLoop(-m_midiClipToPlay->startTimeOffset(), m_midiClipToPlay->length() - m_midiClipToPlay->startTimeOffset());
 			}
 
 			// Handle loop points, and inform VST plugins of the loop status
@@ -661,7 +661,15 @@ void Song::stop()
 	switch (timeline.stopBehaviour())
 	{
 		case Timeline::StopBehaviour::BackToZero:
-			getTimeline().setTicks(0);
+			if (m_playMode == PlayMode::MidiClip)
+			{
+				getPlayPos().setTicks(std::max(0, -m_midiClipToPlay->startTimeOffset()));
+			}
+			else
+			{
+				getPlayPos().setTicks(0);
+			}
+			m_elapsedMilliSeconds[static_cast<std::size_t>(m_playMode)] = 0;
 			break;
 
 		case Timeline::StopBehaviour::BackToStart:
