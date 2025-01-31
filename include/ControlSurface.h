@@ -25,13 +25,29 @@
 #ifndef LMMS_CONTROL_SURFACE_H
 #define LMMS_CONTROL_SURFACE_H
 
+#include <QObject>
+
 #include "lmms_export.h"
 
 namespace lmms {
 //! Implements functions linking controller to LMMS.
-class LMMS_EXPORT ControlSurface
+class LMMS_EXPORT ControlSurface : public QObject
 {
+	Q_OBJECT
 public:
+	ControlSurface();
+
+public:
+signals:
+	void requestPlay();
+	void requestStop();
+	void requestLoop();
+	void requestRecord();
+	void requestPreviousInstrumentTrack();
+	void requestNextInstrumentTrack();
+
+	// Use slots to call from correct thread.
+private slots:
 	///! Starts playing.
 	void play();
 	///! Stops playing.
@@ -40,6 +56,10 @@ public:
 	void loop();
 	///! Starts recording.
 	void record();
+	///! Selects previous instrument track.
+	void previousInstrumentTrack();
+	///! Selects next instrument track.
+	void nextInstrumentTrack();
 };
 } // namespace lmms
 

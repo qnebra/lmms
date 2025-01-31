@@ -26,10 +26,25 @@
 
 #include "Engine.h"
 #include "GuiApplication.h"
+#include "InstrumentTrack.h"
+#include "MidiClip.h"
 #include "PianoRoll.h"
 #include "Song.h"
+#include "SongEditor.h"
 
 namespace lmms {
+
+ControlSurface::ControlSurface()
+{
+	QObject::connect(this, &ControlSurface::requestPlay, this, &ControlSurface::play);
+	QObject::connect(this, &ControlSurface::requestStop, this, &ControlSurface::stop);
+	QObject::connect(this, &ControlSurface::requestLoop, this, &ControlSurface::loop);
+	QObject::connect(this, &ControlSurface::requestRecord, this, &ControlSurface::record);
+	QObject::connect(
+		this, &ControlSurface::requestPreviousInstrumentTrack, this, &ControlSurface::previousInstrumentTrack);
+	QObject::connect(this, &ControlSurface::requestNextInstrumentTrack, this, &ControlSurface::nextInstrumentTrack);
+}
+
 void ControlSurface::play()
 {
 	Engine::getSong()->playSong();
@@ -53,7 +68,64 @@ void ControlSurface::loop()
 
 void ControlSurface::record()
 {
-	auto piano_roll = gui::getGUI()->pianoRoll();
-	if (piano_roll != nullptr) { piano_roll->record(); }
+	// Get the clip.
+	auto assigned_instrument_track = InstrumentTrack::getAutoAssignedTrack();
+	if (assigned_instrument_track != nullptr)
+	{
+		std::vector<Clip*> clips;
+		auto current_time = Engine::getSong()->getPlayPos(Song::PlayMode::Song);
+		assigned_instrument_track->getClipsInRange(clips, current_time, current_time);
+		MidiClip* current_clip = nullptr;
+
+		// If there are no available clips, create a clip.
+		if (!clips.empty()) { current_clip = dynamic_cast<MidiClip*>(clips.front()); }
+		else { current_clip = dynamic_cast<MidiClip*>(assigned_instrument_track->createClip(current_time)); }
+
+		auto piano_roll = gui::getGUI()->pianoRoll();
+		piano_roll->setCurrentMidiClip(current_clip);
+		piano_roll->recordAccompany();
+	}
+}
+
+void followingInstrumentTrack(bool reverse)
+{
+	// Get the clip.
+	auto assigned_instrument_track = InstrumentTrack::getAutoAssignedTrack();
+	const auto track_list = Engine::getSong()->tracks();
+	int next = reverse ? -1 : 1;
+	if (track_list.empty()) { return; }
+
+	int start_ind = reverse ? track_list.size() - 1 : 0;
+	if (assigned_instrument_track != nullptr)
+	{
+		for (size_t ind = 0; ind < track_list.size(); ++ind)
+		{
+			if (track_list[ind] == assigned_instrument_track)
+			{
+				start_ind = (ind + track_list.size() + next) % track_list.size();
+				break;
+			}
+		}
+	}
+	for (size_t iteration = 0; iteration < track_list.size(); ++iteration)
+	{
+		size_t current_ind = (start_ind + track_list.size() + next * iteration) % track_list.size();
+		if (track_list[current_ind]->type() == Track::Type::Instrument)
+		{
+			assigned_instrument_track = dynamic_cast<InstrumentTrack*>(track_list[current_ind]);
+			assigned_instrument_track->autoAssignMidiDevice(true);
+			break;
+		}
+	}
+}
+
+void ControlSurface::previousInstrumentTrack()
+{
+	followingInstrumentTrack(true);
+}
+
+void ControlSurface::nextInstrumentTrack()
+{
+	followingInstrumentTrack(false);
 }
 } // namespace lmms

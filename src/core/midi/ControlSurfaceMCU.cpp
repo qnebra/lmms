@@ -105,16 +105,16 @@ void ControlSurfaceMCU::processInEvent(const MidiEvent& event, const TimePos& ti
 			switch (event.key())
 			{
 			case static_cast<int>(MCUEvents::RECORD):
-				m_controlSurface.record();
+				emit m_controlSurface.requestRecord();
 				break;
 			case static_cast<int>(MCUEvents::LOOP):
-				m_controlSurface.loop();
+				emit m_controlSurface.requestLoop();
 				break;
 			case static_cast<int>(MCUEvents::STOP):
-				m_controlSurface.stop();
+				emit m_controlSurface.requestStop();
 				break;
 			case static_cast<int>(MCUEvents::PLAY):
-				m_controlSurface.play();
+				emit m_controlSurface.requestPlay();
 				break;
 			default:
 				break;
@@ -129,10 +129,10 @@ void ControlSurfaceMCU::processInEvent(const MidiEvent& event, const TimePos& ti
 			switch (event.velocity())
 			{
 			case CLOCKWISE_1:
-				// TODO: implement go to next
+				emit m_controlSurface.requestNextInstrumentTrack();
 				break;
 			case COUNTER_CLOCKWISE_1:
-				// TODO: implement go to previous
+				emit m_controlSurface.requestPreviousInstrumentTrack();
 				break;
 			}
 			break;
