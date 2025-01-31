@@ -65,7 +65,6 @@ public:
 	virtual void unregisterPort( AudioPort * _port );
 	virtual void renamePort( AudioPort * _port );
 
-
 	inline bool supportsCapture() const
 	{
 		return m_supportsCapture;
@@ -76,12 +75,13 @@ public:
 		return m_sampleRate;
 	}
 
-	ch_cnt_t channels() const
+	void processNextBuffer();
+
+	virtual void startProcessing()
 	{
-		return m_channels;
+		m_inProcess = true;
 	}
 
-	virtual void startProcessing();
 	virtual void stopProcessing();
 
 protected:
@@ -95,6 +95,11 @@ protected:
 	// clear given signed-int-16-buffer
 	void clearS16Buffer( int_sample_t * _outbuf,
 							const fpp_t _frames );
+
+	ch_cnt_t channels() const
+	{
+		return m_channels;
+	}
 
 	inline void setSampleRate( const sample_rate_t _new_sr )
 	{
