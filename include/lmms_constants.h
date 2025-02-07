@@ -42,6 +42,17 @@ template<typename T>
 inline constexpr T tau_v = T(pi_v<T> * 2.0);
 inline constexpr double tau = tau_v<double>;
 
+// TODO C++20: Use std::floating_point instead of typename
+// TODO C++20: Use std::numbers::inv_pi_v<T> instead of computed value
+template<typename T>
+inline constexpr T inv_pi_v = T(1.0 / pi_v<T>);
+inline constexpr double inv_pi = inv_pi_v<double>;
+
+// TODO C++20: Use std::floating_point instead of typename
+template<typename T>
+inline constexpr T inv_tau_v = T(1.0 / tau_v<T>);
+inline constexpr double inv_tau = inv_tau_v<double>;
+
 //TODO C++20: Use std::floating_point instead of typename
 template<typename T>
 inline constexpr T pi_half_v = T(pi_v<T> / 2.0);
@@ -65,6 +76,7 @@ inline constexpr double inv_e = e_v<double>;
 
 //TODO C++20: Use std::floating_point instead of typename
 //TODO C++20: Use std::numbers::sqrt2_v<T> instead of literal value
+//TODO C++26: Remove since std::sqrt(2.0) is constexpr
 template<typename T>
 inline constexpr T sqrt2_v = T(1.41421356237309504880168872420969807856967187537695);
 inline constexpr double sqrt2 = sqrt2_v<double>;
