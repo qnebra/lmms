@@ -37,6 +37,8 @@
 #include "StringPairDrag.h"
 #include "TextFloat.h"
 #include "Track.h"
+#include "TrackContainerView.h"
+#include "TrackView.h"
 
 #include "Engine.h"
 
@@ -185,6 +187,15 @@ void AutomationClipView::constructContextMenu( QMenu * _cm )
 	_cm->addAction( embed::getIconPixmap( "flip_x" ),
 						tr( "Flip Horizontally (Visible)" ),
 						this, SLOT(flipX()));
+	_cm->addAction(
+		m_clip->getHasBeenResized() ? embed::getIconPixmap("auto_resize") : embed::getIconPixmap("auto_resize_disable"),
+		m_clip->getHasBeenResized() ? tr("Enable auto-resize") : tr("Disable auto-resize"),
+		[this](){
+			m_clip->setHasBeenResized(!m_clip->getHasBeenResized());
+			m_clip->updateLength();
+		}
+	);
+	
 	if (!m_clip->m_objects.empty())
 	{
 		_cm->addSeparator();
@@ -209,6 +220,8 @@ void AutomationClipView::constructContextMenu( QMenu * _cm )
 
 void AutomationClipView::mouseDoubleClickEvent( QMouseEvent * me )
 {
+	if (m_trackView->trackContainerView()->knifeMode()) { return; }
+
 	if(me->button() != Qt::LeftButton)
 	{
 		me->ignore();
@@ -271,6 +284,7 @@ void AutomationClipView::paintEvent( QPaintEvent * )
 	const float y_scale = max - min;
 	const float h = ( height() - 2 * BORDER_WIDTH ) / y_scale;
 	const float ppTick  = ppb / TimePos::ticksPerBar();
+	const int offset =  m_clip->startTimeOffset() * ppTick;
 
 	p.translate( 0.0f, max * height() / y_scale - BORDER_WIDTH );
 	p.scale( 1.0f, -h );
@@ -291,7 +305,7 @@ void AutomationClipView::paintEvent( QPaintEvent * )
 	{
 		if( it+1 == m_clip->getTimeMap().end() )
 		{
-			const float x1 = POS(it) * ppTick;
+			const float x1 = POS(it) * ppTick + offset;
 			const auto x2 = (float)(width() - BORDER_WIDTH);
 			if( x1 > ( width() - BORDER_WIDTH ) ) break;
 			// We are drawing the space after the last node, so we use the outValue
@@ -319,20 +333,19 @@ void AutomationClipView::paintEvent( QPaintEvent * )
 			: INVAL(it + 1);
 
 		QPainterPath path;
-		QPointF origin = QPointF(POS(it) * ppTick, 0.0f);
-		path.moveTo( origin );
-		path.moveTo(QPointF(POS(it) * ppTick,values[0]));
+		QPointF origin = QPointF(POS(it) * ppTick + offset, 0.0f);
+		path.moveTo(origin);
+		path.moveTo(QPointF(POS(it) * ppTick + offset, values[0]));
 		for (int i = POS(it) + 1; i < POS(it + 1); i++)
 		{
-			float x = i * ppTick;
-			if( x > ( width() - BORDER_WIDTH ) ) break;
+			float x = i * ppTick + offset;
+			if(x > (width() - BORDER_WIDTH)) break;
 			float value = values[i - POS(it)];
-			path.lineTo( QPointF( x, value ) );
-
+			path.lineTo(QPointF(x, value));
 		}
-		path.lineTo((POS(it + 1)) * ppTick, nextValue);
-		path.lineTo((POS(it + 1)) * ppTick, 0.0f);
-		path.lineTo( origin );
+		path.lineTo((POS(it + 1)) * ppTick + offset, nextValue);
+		path.lineTo((POS(it + 1)) * ppTick + offset, 0.0f);
+		path.lineTo(origin);
 
 		if( gradient() )
 		{
@@ -357,10 +370,10 @@ void AutomationClipView::paintEvent( QPaintEvent * )
 		const int bx = BORDER_WIDTH + static_cast<int>(ppb * b) - 2;
 
 		//top line
-		p.drawLine(bx, BORDER_WIDTH, bx, BORDER_WIDTH + lineSize);
+		p.drawLine(bx + offset, BORDER_WIDTH, bx + offset, BORDER_WIDTH + lineSize);
 
 		//bottom line
-		p.drawLine(bx, rect().bottom() - (lineSize + BORDER_WIDTH), bx, rect().bottom() - BORDER_WIDTH);
+		p.drawLine(bx + offset, rect().bottom() - (lineSize + BORDER_WIDTH), bx + offset, rect().bottom() - BORDER_WIDTH);
 	}
 
 	// recording icon for when recording automation
@@ -389,6 +402,12 @@ void AutomationClipView::paintEvent( QPaintEvent * )
 		const int size = 14;
 		p.drawPixmap( spacing, height() - ( size + spacing ),
 			embed::getIconPixmap( "muted", size, size ) );
+	}
+	
+	if (m_marker)
+	{
+		p.setPen(markerColor());
+		p.drawLine(m_markerPos, rect().bottom(), m_markerPos, rect().top());
 	}
 
 	p.end();
@@ -485,6 +504,5 @@ void AutomationClipView::scaleTimemapToFit( float oldMin, float oldMax )
 
 	m_clip->generateTangents();
 }
-
 
 } // namespace lmms::gui

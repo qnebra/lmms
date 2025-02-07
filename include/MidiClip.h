@@ -53,7 +53,6 @@ public:
 	} ;
 
 	MidiClip( InstrumentTrack* instrumentTrack );
-	MidiClip( const MidiClip& other );
 	~MidiClip() override;
 
 	void init();
@@ -111,6 +110,11 @@ public:
 
 	gui::ClipView * createView( gui::TrackView * _tv ) override;
 
+	MidiClip* clone() override
+	{
+		return new MidiClip(*this);
+	}
+
 
 	using Model::dataChanged;
 
@@ -121,6 +125,7 @@ public slots:
 	void clear();
 
 protected:
+	MidiClip( const MidiClip& other );
 	void updatePatternTrack();
 
 protected slots:
