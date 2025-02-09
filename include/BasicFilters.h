@@ -33,6 +33,7 @@
 
 #include <cmath>
 #include <array>
+#include <numbers>
 
 #include "lmms_basics.h"
 #include "lmms_constants.h"
@@ -69,21 +70,22 @@ public:
 
 	inline void setCoeffs( float freq )
 	{
+		using namespace std::numbers;
 		// wc
-		const double wc = numbers::tau * freq;
+		const double wc = 2 * pi * freq;
 		const double wc2 = wc * wc;
 		const double wc3 = wc2 * wc;
 		m_wc4 = wc2 * wc2;
 
 		// k
-		const double k = wc / std::tan(numbers::pi * freq / m_sampleRate);
+		const double k = wc / std::tan(pi * freq / m_sampleRate);
 		const double k2 = k * k;
 		const double k3 = k2 * k;
 		m_k4 = k2 * k2;
 
 		// a
-		const double sq_tmp1 = numbers::sqrt2 * wc3 * k;
-		const double sq_tmp2 = numbers::sqrt2 * wc * k3;
+		const double sq_tmp1 = sqrt2 * wc3 * k;
+		const double sq_tmp2 = sqrt2 * wc * k3;
 
 		m_a = 1.0 / ( 4.0 * wc2 * k2 + 2.0 * sq_tmp1 + m_k4 + 2.0 * sq_tmp2 + m_wc4 );
 
@@ -701,6 +703,7 @@ public:
 
 	inline void calcFilterCoeffs( float _freq, float _q )
 	{
+		using namespace std::numbers;
 		// temp coef vars
 		_q = std::max(_q, minQ());
 
@@ -713,7 +716,7 @@ public:
 		{
 			_freq = std::clamp(_freq, 50.0f, 20000.0f);
 			const float sr = m_sampleRatio * 0.25f;
-			const float f = 1.0f / (_freq * numbers::tau_v<float>);
+			const float f = 1.0f / (_freq * 2 * pi_v<float>);
 			
 			m_rca = 1.0f - sr / ( f + sr );
 			m_rcb = 1.0f - m_rca;
@@ -746,8 +749,8 @@ public:
 			const float fract = vowelf - vowel;
 
 			// interpolate between formant frequencies
-			const float f0 = 1.0f / (linearInterpolate(_f[vowel+0][0], _f[vowel+1][0], fract) * numbers::tau_v<float>);
-			const float f1 = 1.0f / (linearInterpolate(_f[vowel+0][1], _f[vowel+1][1], fract) * numbers::tau_v<float>);
+			const float f0 = 1.0f / (linearInterpolate(_f[vowel+0][0], _f[vowel+1][0], fract) * 2 * pi_v<float>);
+			const float f1 = 1.0f / (linearInterpolate(_f[vowel+0][1], _f[vowel+1][1], fract) * 2 * pi_v<float>);
 
 			// samplerate coeff: depends on oversampling
 			const float sr = m_type == FilterType::FastFormant ? m_sampleRatio : m_sampleRatio * 0.25f;
@@ -796,7 +799,7 @@ public:
 			m_type == FilterType::Highpass_SV ||
 			m_type == FilterType::Notch_SV )
 		{
-			const float f = std::sin(std::max(minFreq(), _freq) * m_sampleRatio * numbers::pi_v<float>);
+			const float f = std::sin(std::max(minFreq(), _freq) * m_sampleRatio * pi_v<float>);
 			m_svf1 = std::min(f, 0.825f);
 			m_svf2 = std::min(f * 2.0f, 0.825f);
 			m_svq = std::max(0.0001f, 2.0f - (_q * 0.1995f));
@@ -805,7 +808,7 @@ public:
 
 		// other filters
 		_freq = std::clamp(_freq, minFreq(), 20000.0f);
-		const float omega = numbers::tau_v<float> * _freq * m_sampleRatio;
+		const float omega = 2 * pi_v<float> * _freq * m_sampleRatio;
 		const float tsin = std::sin(omega) * 0.5f;
 		const float tcos = std::cos(omega);
 

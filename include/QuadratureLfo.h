@@ -25,6 +25,8 @@
 #ifndef LMMS_QUADRATURE_LFO_H
 #define LMMS_QUADRATURE_LFO_H
 
+#include <numbers>
+
 #include "lmms_math.h"
 
 namespace lmms
@@ -37,7 +39,7 @@ public:
 	QuadratureLfo( int sampleRate ) :
 		m_frequency(0),
 		m_phase(0),
-		m_offset(numbers::pi_half)
+		m_offset(std::numbers::pi / 2.0)
 	{
 		setSampleRate(sampleRate);
 	}
