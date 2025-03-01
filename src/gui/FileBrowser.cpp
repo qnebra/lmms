@@ -568,9 +568,16 @@ void FileBrowserTreeWidget::keyPressEvent(QKeyEvent * ke )
 	else if (vertical || horizontal || preview || insert) { stopPreview(); }
 
 	// Try to get the currently selected item as a FileItem
-	auto file = dynamic_cast<FileItem*>(currentItem());
-	// If it's null (folder, separator, etc.), there's nothing left for us to do
-	if (file == nullptr) { return; }
+	auto item = currentItem();
+
+	auto file = dynamic_cast<FileItem*>(item);
+
+	if (!file)
+	{
+			// If it's not a file and the item is being previewed, assume it's a directory and try to expand or shrink it
+			if (preview) { item->setExpanded(!item->isExpanded()); }
+			return;
+	}
 
 	// When moving to a new sound, preview it. Skip presets, they can play forever
 	if (vertical && file->type() == FileItem::FileType::Sample)
