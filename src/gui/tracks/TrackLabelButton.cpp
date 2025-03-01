@@ -82,7 +82,7 @@ void TrackLabelButton::rename()
 		renameDlg.exec();
 		if( txt != text() )
 		{
-			m_trackView->getTrack()->setName( txt );
+			m_trackView->getTrack()->setName(txt, true);
 		}
 	}
 	else
@@ -120,7 +120,7 @@ void TrackLabelButton::renameFinished()
 			if( m_renameLineEdit->text() != m_trackView->getTrack()->name() )
 			{
 				setText( elideName( m_renameLineEdit->text() ) );
-				m_trackView->getTrack()->setName( m_renameLineEdit->text() );
+				m_trackView->getTrack()->setName(m_renameLineEdit->text(), true);
 			}
 		}
 	}
