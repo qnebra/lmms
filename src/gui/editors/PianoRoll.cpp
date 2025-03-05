@@ -1614,19 +1614,8 @@ void PianoRoll::mousePressEvent(QMouseEvent * me )
 	// -- Knife
 	if (m_editMode == EditMode::Knife && me->button() == Qt::LeftButton)
 	{
-		NoteVector n;
-		Note* note = noteUnderMouse();
-
-		if (note)
-		{
-			n.push_back(note);
-
-			updateKnifePos(me);
-
-			// Call splitNotes for the note
-			m_midiClip->splitNotes(n, TimePos(m_knifeTickPos));
-		}
-
+		updateKnifePos(me, true);
+		m_knifeDown = true;
 		update();
 		return;
 	}
@@ -1637,14 +1626,6 @@ void PianoRoll::mousePressEvent(QMouseEvent * me )
 		const auto& selectedNotes = getSelectedNotes();
 		if (std::find(selectedNotes.begin(), selectedNotes.end(), noteUnderMouse()) != selectedNotes.end())
 		{
-			updateStrumPos(me, true, me->modifiers() & Qt::ShiftModifier);
-			m_strumEnabled = true;
-			update();
-		}
-		// Or, if no notes are selected, setup the notes overlapping the clicked note as the chord
-		if (selectedNotes.empty() && noteUnderMouse())
-		{
-			setupClickedChord();
 			updateStrumPos(me, true, me->modifiers() & Qt::ShiftModifier);
 			m_strumEnabled = true;
 			update();
@@ -2165,6 +2146,7 @@ void PianoRoll::setKnifeAction()
 		m_knifeMode = m_editMode;
 		m_editMode = EditMode::Knife;
 		m_action = Action::Knife;
+		m_knifeDown = false;
 		setCursor(Qt::ArrowCursor);
 		update();
 	}
@@ -2174,6 +2156,7 @@ void PianoRoll::cancelKnifeAction()
 {
 	m_editMode = m_knifeMode;
 	m_action = Action::None;
+	m_knifeDown = false;
 	update();
 }
 
@@ -2329,6 +2312,13 @@ void PianoRoll::mouseReleaseEvent( QMouseEvent * me )
 		else if (m_action == Action::Strum || m_strumEnabled)
 		{
 			m_strumEnabled = false;
+    }
+		else if (m_action == Action::Knife && hasValidMidiClip())
+		{
+			bool deleteShortEnds = me->modifiers() & Qt::ShiftModifier;
+			const NoteVector selectedNotes = getSelectedNotes();
+			m_midiClip->splitNotesAlongLine(!selectedNotes.empty() ? selectedNotes : m_midiClip->notes(), TimePos(m_knifeStartTickPos), m_knifeStartKey, TimePos(m_knifeEndTickPos), m_knifeEndKey, deleteShortEnds);
+			m_knifeDown = false;
 		}
 
 		if( m_action == Action::MoveNote || m_action == Action::ResizeNote )
@@ -2433,7 +2423,7 @@ void PianoRoll::mouseMoveEvent( QMouseEvent * me )
 	// Update Knife position if we are on knife mode
 	if (m_editMode == EditMode::Knife)
 	{
-		updateKnifePos(me);
+		updateKnifePos(me, false);
 	}
 
 	// Update Strum position if we are on knife mode
@@ -2820,19 +2810,27 @@ void PianoRoll::mouseMoveEvent( QMouseEvent * me )
 
 
 
-void PianoRoll::updateKnifePos(QMouseEvent* me)
+void PianoRoll::updateKnifePos(QMouseEvent* me, bool initial)
 {
 	// Calculate the TimePos from the mouse
-	int mouseViewportPos = me->x() - m_whiteKeyWidth;
-	int mouseTickPos = mouseViewportPos * TimePos::ticksPerBar() / m_ppb + m_currentPosition;
+	int mouseViewportPosX = me->x() - m_whiteKeyWidth;
+	int mouseViewportPosY = keyAreaBottom() - 1 - me->y();
+	int mouseTickPos = mouseViewportPosX * TimePos::ticksPerBar() / m_ppb + m_currentPosition;
+	int mouseKey = std::round(1.f * mouseViewportPosY / m_keyLineHeight) + m_startKey - 1;
 
 	// If ctrl is not pressed, quantize the position
 	if (!(me->modifiers() & Qt::ControlModifier))
 	{
-		mouseTickPos = floor(mouseTickPos / quantization()) * quantization();
+		mouseTickPos = std::round(1.f * mouseTickPos / quantization()) * quantization();
 	}
 
-	m_knifeTickPos = mouseTickPos;
+	if (initial)
+	{
+		m_knifeStartTickPos = mouseTickPos;
+		m_knifeStartKey = mouseKey;
+	}
+	m_knifeEndTickPos = mouseTickPos;
+	m_knifeEndKey = mouseKey;
 }
 
 /*
@@ -2872,45 +2870,6 @@ void PianoRoll::setupSelectedChords()
 }
 
 /*
- * Setup selected chords, but without the selection.
- * This is meant for using the strum tool without first selecting notes. If no notes are selected, this treats the notes overlapping the clicked note as the chord.
-*/
-void PianoRoll::setupClickedChord()
-{
-	if (!hasValidMidiClip()) { return; }
-	m_selectedChords.clear();
-	m_midiClip->rearrangeAllNotes();
-
-	const NoteVector& selectedNotes = getSelectedNotes();
-	if (!selectedNotes.empty()) { return; }
-
-	Note* clickedNote = noteUnderMouse();
-	if (clickedNote)
-	{
-		int maxTime = -1;
-		NoteVector currentChord;
-		bool foundClickedNote = false;
-		for (Note* note: m_midiClip->notes())
-		{
-			// If the note is not in the current chord range (and this isn't the first chord), start a new chord.
-			// If this current chord contains the clicked note, then the search is done, and we can use this chord as the selected chord.
-			if (note->pos() >= maxTime && maxTime != -1)
-			{
-				if (foundClickedNote) { break; }
-				currentChord.clear();
-				maxTime = note->endPos();
-			}
-			maxTime = std::max(maxTime, static_cast<int>(note->endPos()));
-			currentChord.push_back(note);
-			if (note == clickedNote) { foundClickedNote = true; }
-		}
-		// Sort the notes by key before adding the chord to the vector
-		std::sort(currentChord.begin(), currentChord.end(), [](Note* a, Note* b){ return a->key() < b->key(); });
-		m_selectedChords.push_back(currentChord);
-	}
-}
-
-/*
  * Perform the Strum
  *
  * Notes above the clicked note (relative to each chord) will be strummed down, notes below will be strummed up.
@@ -2918,6 +2877,7 @@ void PianoRoll::setupClickedChord()
 */
 void PianoRoll::updateStrumPos(QMouseEvent* me, bool initial, bool warp)
 {
+	if (!hasValidMidiClip()) { return; }
 	// Calculate the TimePos from the mouse
 	int mouseViewportPos = me->x() - m_whiteKeyWidth;
 	int mouseTickPos = mouseViewportPos * TimePos::ticksPerBar() / m_ppb + m_currentPosition;
@@ -3744,37 +3704,19 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 		}
 
 		// -- Knife tool (draw cut line)
-		if (m_action == Action::Knife)
+		if (m_action == Action::Knife && m_knifeDown)
 		{
 			auto xCoordOfTick = [this](int tick) {
 				return m_whiteKeyWidth + (
 					(tick - m_currentPosition) * m_ppb / TimePos::ticksPerBar());
 			};
-			Note* n = noteUnderMouse();
-			if (n)
-			{
-				const int key = n->key() - m_startKey + 1;
-				int y = y_base - key * m_keyLineHeight;
+			int x1 = xCoordOfTick(m_knifeStartTickPos);
+			int y1 = y_base - (m_knifeStartKey - m_startKey + 1) * m_keyLineHeight;
+			int x2 = xCoordOfTick(m_knifeEndTickPos);
+			int y2 = y_base - (m_knifeEndKey - m_startKey + 1) * m_keyLineHeight;
 
-				int x = xCoordOfTick(m_knifeTickPos);
-
-				if (x > xCoordOfTick(n->pos()) &&
-					x < xCoordOfTick(n->pos() + n->length()))
-				{
-					p.setPen(QPen(m_knifeCutLineColor, 1));
-					p.drawLine(x, y, x, y + m_keyLineHeight);
-
-					setCursor(Qt::BlankCursor);
-				}
-				else
-				{
-					setCursor(Qt::ArrowCursor);
-				}
-			}
-			else
-			{
-				setCursor(Qt::ArrowCursor);
-			}
+			p.setPen(QPen(m_knifeCutLineColor, 1));
+			p.drawLine(x1, y1, x2, y2);
 		}
 		// -- End knife tool
 

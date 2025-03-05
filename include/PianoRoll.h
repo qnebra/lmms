@@ -463,16 +463,19 @@ private:
 	// did we start a mouseclick with shift pressed
 	bool m_startedWithShift;
 
-	// Variable that holds the position in ticks for the knife action
-	int m_knifeTickPos;
-	void updateKnifePos(QMouseEvent* me);
+	// Variables that hold the start and end position for the knife line
+	TimePos m_knifeStartTickPos;
+	int m_knifeStartKey;
+	TimePos m_knifeEndTickPos;
+	int m_knifeEndKey;
+	bool m_knifeDown;
+
+	void updateKnifePos(QMouseEvent* me, bool initial);
 
 	//! Stores the chords for the strum tool
 	std::vector<NoteVector> m_selectedChords;
 	//! Computes which notes belong to which chords from the selection
 	void setupSelectedChords();
-	//! Computes which notes belong to a single chord based on the clicked note
-	void setupClickedChord();
 
 	TimePos m_strumStartTime;
 	TimePos m_strumCurrentTime;
