@@ -1138,6 +1138,11 @@ void PianoRoll::drawDetuningInfo( QPainter & _p, const Note * _n, int _x,
 			}
 		}
 
+		if (m_editMode == EditMode::Detuning && _n->selected())
+		{
+			_p.drawEllipse(cur_x - 5, cur_y - 5, 10, 10);
+		}
+
 		old_x = cur_x;
 		old_y = cur_y;
 	}
@@ -1614,22 +1619,32 @@ void PianoRoll::mousePressEvent(QMouseEvent * me )
 		return;
 	}
 
-	if( m_editMode == EditMode::Detuning && noteUnderMouse() )
+	if (m_editMode == EditMode::Detuning)
 	{
-		static QPointer<AutomationClip> detuningClip = nullptr;
-		if (detuningClip.data() != nullptr)
+		bool notesFound = setupParameterEditNotes(Note::ParameterType::Detuning);
+		if (!notesFound) { return; }
+
+		for (Note* note: m_selectedParameterEditNotes)
 		{
-			detuningClip->disconnect(this);
+			if (note->detuning() == nullptr)
+			{
+				note->createDetuning();
+				AutomationClip* detuningClip = note->detuning()->automationClip();
+				connect(detuningClip, SIGNAL(dataChanged()), this, SLOT(update()));
+			}
 		}
-		Note* n = noteUnderMouse();
-		if (n->detuning() == nullptr)
+
+		// Let users access automation editor with shift-click
+		if (noteUnderMouse() && me->modifiers() & Qt::ShiftModifier)
 		{
-			n->createDetuning();
+			getGUI()->automationEditor()->setGhostMidiClip(m_midiClip);
+			getGUI()->automationEditor()->open(noteUnderMouse()->detuning()->automationClip());
+			return;
 		}
-		detuningClip = n->detuning()->automationClip();
-		connect(detuningClip.data(), SIGNAL(dataChanged()), this, SLOT(update()));
-		getGUI()->automationEditor()->setGhostMidiClip(m_midiClip);
-		getGUI()->automationEditor()->open(detuningClip);
+
+		m_midiClip->addJournalCheckPoint();
+
+		updateParameterEditPos(me, Note::ParameterType::Detuning);
 		return;
 	}
 
@@ -2285,6 +2300,11 @@ void PianoRoll::mouseReleaseEvent( QMouseEvent * me )
 		}
 	}
 
+	if (m_editMode == EditMode::Detuning)
+	{
+		applyParameterEditPos(me, Note::ParameterType::Detuning);
+	}
+
 	if( me->button() & Qt::RightButton )
 	{
 		m_mouseDownRight = false;
@@ -2377,6 +2397,11 @@ void PianoRoll::mouseMoveEvent( QMouseEvent * me )
 	if (m_editMode == EditMode::Knife)
 	{
 		updateKnifePos(me, false);
+	}
+
+	if (m_editMode == EditMode::Detuning && m_parameterEditDown)
+	{
+		updateParameterEditPos(me, Note::ParameterType::Detuning);
 	}
 
 	if( me->y() > PR_TOP_MARGIN || m_action != Action::None )
@@ -2755,6 +2780,95 @@ void PianoRoll::mouseMoveEvent( QMouseEvent * me )
 }
 
 
+void PianoRoll::updateParameterEditPos(QMouseEvent* me, Note::ParameterType paramType)
+{
+	if (me->type() == QEvent::MouseButtonPress) {
+		m_parameterEditDown = true;
+		m_parameterEditDownRight = me->button() & Qt::RightButton;
+		m_lastParameterEditTick = -1;
+	}
+
+	Note* clickedNote = parameterEditNoteUnderMouse(paramType);
+	if (!clickedNote) { return; }
+
+	int key_num = getKey( me->y() );
+	int pos_ticks = (me->x() - m_whiteKeyWidth) *
+			TimePos::ticksPerBar() / m_ppb + m_currentPosition;
+
+	TimePos relativePos = pos_ticks - clickedNote->pos();
+	int relativeKey = key_num - clickedNote->key();
+
+	AutomationClip::setQuantization(quantization());
+	for (Note* note: m_selectedParameterEditNotes)
+	{
+		AutomationClip * aClip = nullptr;
+		switch (paramType)
+		{
+			case Note::ParameterType::Detuning:
+				aClip = note->detuning()->automationClip();
+				break;
+			default:
+				continue;
+		}
+		if (!m_parameterEditDownRight)
+		{
+			aClip->setDragValue(relativePos, relativeKey);
+		}
+		else
+		{
+			if (m_lastParameterEditTick != -1)
+			{
+				aClip->removeNodes(m_lastParameterEditTick - clickedNote->pos(), relativePos);
+			}
+			else
+			{
+				aClip->removeNode(relativePos);
+			}
+		}
+	}
+	m_lastParameterEditTick = pos_ticks;
+}
+
+void PianoRoll::applyParameterEditPos(QMouseEvent* me, Note::ParameterType paramType)
+{
+	if (m_parameterEditDown && me->button() & Qt::LeftButton)
+	{
+		for (Note* note: m_selectedParameterEditNotes)
+		{
+			AutomationClip * aClip = nullptr;
+			switch (paramType)
+			{
+				case Note::ParameterType::Detuning:
+					aClip = note->detuning()->automationClip();
+					break;
+				default:
+					continue;
+			}
+			aClip->applyDragValue();
+		}
+	}
+	if (me->button() & Qt::RightButton)
+	{
+		m_parameterEditDownRight = false;
+	}
+	m_parameterEditDown = false;
+}
+
+bool PianoRoll::setupParameterEditNotes(Note::ParameterType paramType)
+{
+	if (!getSelectedNotes().empty())
+	{
+		m_selectedParameterEditNotes = getSelectedNotes();
+		return true;
+	}
+	else if (noteUnderMouse())
+	{
+		m_selectedParameterEditNotes.assign(1, noteUnderMouse());
+		noteUnderMouse()->setSelected(true);
+		return true;
+	}
+	return false;
+}
 
 
 void PianoRoll::updateKnifePos(QMouseEvent* me, bool initial)
@@ -4716,6 +4830,54 @@ Note * PianoRoll::noteUnderMouse()
 	}
 
 	return nullptr;
+}
+
+
+Note * PianoRoll::parameterEditNoteUnderMouse(Note::ParameterType paramType)
+{
+	QPoint pos = mapFromGlobal( QCursor::pos() );
+
+	if (pos.x() <= m_whiteKeyWidth
+		|| pos.x() > width() - SCROLLBAR_SIZE
+		|| pos.y() < PR_TOP_MARGIN
+		|| pos.y() > keyAreaBottom() )
+	{
+		return nullptr;
+	}
+
+	int key_num = getKey( pos.y() );
+	int pos_ticks = (pos.x() - m_whiteKeyWidth) *
+			TimePos::ticksPerBar() / m_ppb + m_currentPosition;
+	// Loop through all parameter edit notes
+	int minDifference = -1;
+	Note* closestNote = nullptr;
+	for(Note* note : m_selectedParameterEditNotes)
+	{
+		if (pos_ticks < note->pos() || pos_ticks > note->endPos()) { continue; }
+		// Get realtive position
+		TimePos relativePos = pos_ticks - note->pos();
+		// Get relative key
+		int relativeKey = key_num - note->key();
+		// Calculate distance to parameter curve
+		AutomationClip* aClip = nullptr;
+		switch (paramType)
+		{
+			case Note::ParameterType::Detuning:
+				aClip = note->detuning()->automationClip();
+				break;
+			default:
+				continue;
+		}
+		if (aClip == nullptr) { continue; }
+
+		int differenceFromCurve = std::abs(relativeKey - aClip->valueAt(relativePos));
+		if (differenceFromCurve < minDifference || minDifference == -1)
+		{
+			minDifference = differenceFromCurve;
+			closestNote = note;
+		}
+	}
+	return closestNote;
 }
 
 void PianoRoll::changeSnapMode()

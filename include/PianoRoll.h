@@ -365,6 +365,7 @@ private:
 	static const std::vector<float> m_zoomYLevels;
 
 	MidiClip* m_midiClip;
+	NoteVector m_selectedParameterEditNotes;
 	NoteVector m_ghostNotes;
 
 	inline const NoteVector & ghostNotes() const
@@ -448,6 +449,8 @@ private:
 	void drawDetuningInfo( QPainter & _p, const Note * _n, int _x, int _y ) const;
 	bool mouseOverNote();
 	Note * noteUnderMouse();
+	//! Calculates the closest note to the mouse given their parameter automation curve
+	Note* parameterEditNoteUnderMouse(Note::ParameterType paramType);
 
 	// turn a selection rectangle into selected notes
 	void computeSelectedNotes( bool shift );
@@ -464,6 +467,14 @@ private:
 	bool m_knifeDown;
 
 	void updateKnifePos(QMouseEvent* me, bool initial);
+
+	bool m_parameterEditDown = false;
+	bool m_parameterEditDownRight = false;
+	int m_lastParameterEditTick = -1;
+
+	void updateParameterEditPos(QMouseEvent* me, Note::ParameterType paramType);
+	void applyParameterEditPos(QMouseEvent* me, Note::ParameterType paramType);
+	bool setupParameterEditNotes(Note::ParameterType paramType);
 
 	friend class PianoRollWindow;
 
