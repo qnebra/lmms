@@ -77,19 +77,26 @@ enum TreeWidgetItemTypes
 	TypeDirectoryItem
 } ;
 
+FileBrowser* FileBrowser::m_favoritesBrowserInstance = nullptr;
+
 
 FileBrowser::FileBrowser(const QString & directories, const QString & filter,
 			const QString & title, const QPixmap & pm,
 			QWidget * parent, bool dirs_as_items,
 			const QString& userDir,
-			const QString& factoryDir):
-	SideBarWidget( title, pm, parent ),
-	m_directories( directories ),
-	m_filter( filter ),
-	m_dirsAsItems( dirs_as_items ),
+			const QString& factoryDir,
+			const bool isFavoritesBrowser
+			):
+	SideBarWidget(title, pm, parent),
+	m_isFavoritesBrowser(isFavoritesBrowser),
+	m_directories(directories),
+	m_filter(filter),
+	m_dirsAsItems(dirs_as_items),
 	m_userDir(userDir),
 	m_factoryDir(factoryDir)
 {
+	if (isFavoritesBrowser) { m_favoritesBrowserInstance = this; }
+
 	setWindowTitle( tr( "Browser" ) );
 
 	addContentCheckBox();
@@ -329,7 +336,7 @@ void FileBrowser::reloadTree()
 
 	m_fileBrowserTreeWidget->clear();
 
-	QStringList paths = m_directories.split('*');
+	QStringList paths = m_directories.isEmpty() ? QStringList() : m_directories.split('*');
 
 	if (m_showUserContent && !m_showUserContent->isChecked())
 	{
@@ -339,6 +346,15 @@ void FileBrowser::reloadTree()
 	if (m_showFactoryContent && !m_showFactoryContent->isChecked())
 	{
 		paths.removeAll(m_factoryDir);
+	}
+
+	if (m_isFavoritesBrowser)
+	{
+		for (auto& item : ConfigManager::getFavorites())
+		{
+			QFileInfo entry = QFileInfo(ConfigManager::removeTrailingSeparators(item));
+			addEntry(entry, entry.absoluteDir().absolutePath());
+		}
 	}
 
 	if (!paths.isEmpty())
@@ -397,79 +413,94 @@ void FileBrowser::giveFocusToFilter()
 
 
 
+void FileBrowser::addEntry(const QFileInfo & entry, const QString & path)
+{
+	if (excludedPaths().contains(entry.absoluteFilePath())) { return; }
+
+	// Normalize the path
+	QString normalizedPath = QDir::cleanPath(entry.canonicalFilePath());
+
+	// Remove trailing separator if it exists
+	if (normalizedPath.endsWith(QDir::separator())) {
+		normalizedPath.chop(1); // Remove the last character if it's a '/'
+	}
+
+	// Now get the file name from the normalized path
+	QString fileName = QFileInfo(normalizedPath).fileName();
+
+	if (entry.isHidden() && m_showHiddenContent && !m_showHiddenContent->isChecked()) return;
+	if (entry.isDir())
+	{
+		// Merge dirs together
+		bool orphan = true;
+		for (int i = 0; i < m_fileBrowserTreeWidget->topLevelItemCount(); ++i)
+		{
+			auto d = dynamic_cast<Directory*>(m_fileBrowserTreeWidget->topLevelItem(i));
+			if (d == nullptr || fileName < d->text(0))
+			{
+				// insert before item, we're done
+				auto dd = new Directory(fileName, path, m_filter);
+				m_fileBrowserTreeWidget->insertTopLevelItem(i,dd);
+				dd->update(); // add files to the directory
+				orphan = false;
+				break;
+			}
+			else if (fileName == d->text(0))
+			{
+				// imagine we have subdirs named "TripleOscillator/xyz" in
+				// two directories from m_directories
+				// then only add one tree widget for both
+				// so we don't add a new Directory - we just
+				// add the path to the current directory
+				d->addDirectory(path);
+				d->update();
+				orphan = false;
+				break;
+			}
+		}
+		if (orphan)
+		{
+			// it has not yet been added yet, so it's (lexically)
+			// larger than all other dirs => append it at the bottom
+			auto d = new Directory(fileName, path, m_filter);
+			d->update();
+			m_fileBrowserTreeWidget->addTopLevelItem(d);
+		}
+	}
+	else if (entry.isFile())
+	{
+		// TODO: don't insert instead of removing, order changed
+		// remove existing file-items
+		QList<QTreeWidgetItem *> existing = m_fileBrowserTreeWidget->findItems(fileName, Qt::MatchFixedString);
+		if (!existing.empty())
+		{
+			delete existing.front();
+		}
+		(void) new FileItem(m_fileBrowserTreeWidget, fileName, path);
+	}
+}
+
 void FileBrowser::addItems(const QString & path )
 {
-	if (FileBrowser::excludedPaths().contains(path)) { return; }
+   if (FileBrowser::excludedPaths().contains(path)) { return; }
 
-	if( m_dirsAsItems )
-	{
-		m_fileBrowserTreeWidget->addTopLevelItem( new Directory( path, QString(), m_filter ) );
-		return;
-	}
+   if( m_dirsAsItems )
+   {
+	   m_fileBrowserTreeWidget->addTopLevelItem( new Directory( path, QString(), m_filter ) );
+	   return;
+   }
 
-	// try to add all directories from file system alphabetically into the tree
-	QDir cdir(path);
-	if (!cdir.isReadable()) { return; }
-	QFileInfoList entries = cdir.entryInfoList(
-		m_filter.split(' '),
-		dirFilters(),
-		QDir::LocaleAware | QDir::DirsFirst | QDir::Name | QDir::IgnoreCase);
-	for (const auto& entry : entries)
-	{
-		if (FileBrowser::excludedPaths().contains(entry.absoluteFilePath())) { continue; }
-
-		QString fileName = entry.fileName();
-		if (entry.isHidden() && m_showHiddenContent && !m_showHiddenContent->isChecked()) continue;
-		if (entry.isDir())
-		{
-			// Merge dir's together
-			bool orphan = true;
-			for (int i = 0; i < m_fileBrowserTreeWidget->topLevelItemCount(); ++i)
-			{
-				auto d = dynamic_cast<Directory*>(m_fileBrowserTreeWidget->topLevelItem(i));
-				if (d == nullptr || fileName < d->text(0))
-				{
-					// insert before item, we're done
-					auto dd = new Directory(fileName, path, m_filter);
-					m_fileBrowserTreeWidget->insertTopLevelItem(i,dd);
-					dd->update(); // add files to the directory
-					orphan = false;
-					break;
-				}
-				else if (fileName == d->text(0))
-				{
-					// imagine we have subdirs named "TripleOscillator/xyz" in
-					// two directories from m_directories
-					// then only add one tree widget for both
-					// so we don't add a new Directory - we just
-					// add the path to the current directory
-					d->addDirectory(path);
-					d->update();
-					orphan = false;
-					break;
-				}
-			}
-			if (orphan)
-			{
-				// it has not yet been added yet, so it's (lexically)
-				// larger than all other dirs => append it at the bottom
-				auto d = new Directory(fileName, path, m_filter);
-				d->update();
-				m_fileBrowserTreeWidget->addTopLevelItem(d);
-			}
-		}
-		else if (entry.isFile())
-		{
-			// TODO: don't insert instead of removing, order changed
-			// remove existing file-items
-			QList<QTreeWidgetItem *> existing = m_fileBrowserTreeWidget->findItems(fileName, Qt::MatchFixedString);
-			if (!existing.empty())
-			{
-				delete existing.front();
-			}
-			(void) new FileItem(m_fileBrowserTreeWidget, fileName, path);
-		}
-	}
+   // try to add all directories from file system alphabetically into the tree
+   QDir cdir(path);
+   if (!cdir.isReadable()) { return; }
+   QFileInfoList entries = cdir.entryInfoList(
+	   m_filter.split(' '),
+	   dirFilters(),
+	   QDir::LocaleAware | QDir::DirsFirst | QDir::Name | QDir::IgnoreCase);
+   for (const auto& entry : entries)
+   {
+	   addEntry(entry, path);
+   }
 }
 
 
@@ -642,6 +673,7 @@ void FileBrowserTreeWidget::contextMenuEvent(QContextMenuEvent* e)
 	{
 	case TypeFileItem: {
 		auto file = dynamic_cast<FileItem*>(item);
+		bool _isFavorite = isFavorite(file->fullName());
 
 		if (file->isTrack())
 		{
@@ -652,6 +684,14 @@ void FileBrowserTreeWidget::contextMenuEvent(QContextMenuEvent* e)
 
 		contextMenu.addAction(QIcon(embed::getIconPixmap("folder")), tr("Show in %1").arg(fileManager),
 			[=] { FileRevealer::reveal(file->fullName()); });
+
+
+		contextMenu.addAction(
+		   !_isFavorite ? tr("Add favorite file") : tr("Remove favorite file"),
+		std::function([=, this] {
+				!_isFavorite ? addFavorite(file->fullName()) : removeFavorite(file->fullName());
+			})
+		);
 
 		auto songEditorHeader = new QAction(tr("Song Editor"), nullptr);
 		songEditorHeader->setDisabled(true);
@@ -666,9 +706,18 @@ void FileBrowserTreeWidget::contextMenuEvent(QContextMenuEvent* e)
 	}
 	case TypeDirectoryItem: {
 		auto dir = dynamic_cast<Directory*>(item);
+		bool _isFavorite = isFavorite(dir->fullName());
+
 		contextMenu.addAction(QIcon(embed::getIconPixmap("folder")), tr("Open in %1").arg(fileManager), [=] {
 			FileRevealer::openDir(dir->fullName());
 		});
+
+		contextMenu.addAction(
+			!_isFavorite ? tr("Add favorite folder") : tr("Remove favorite folder"),
+			std::function([=, this] {
+					!_isFavorite ? addFavorite(dir->fullName()) : removeFavorite(dir->fullName());
+			})
+		);
 		break;
 	}
 	}
@@ -703,6 +752,25 @@ QList<QAction*> FileBrowserTreeWidget::getContextActions(FileItem* file, bool so
 	return result;
 }
 
+void FileBrowserTreeWidget::addFavorite(QString item)
+{
+	item = ConfigManager::removeTrailingSeparators(item);
+	ConfigManager::addFavoriteItem(item);
+	FileBrowser::getFavoritesBrowserInstance()->reloadTree();
+}
+
+void FileBrowserTreeWidget::removeFavorite(QString item)
+{
+	item = ConfigManager::removeTrailingSeparators(item);
+	ConfigManager::removeFavoriteItem(item);
+	FileBrowser::getFavoritesBrowserInstance()->reloadTree();
+}
+
+bool FileBrowserTreeWidget::isFavorite(QString item)
+{
+	item = ConfigManager::removeTrailingSeparators(item);
+	return ConfigManager::isFavorite(item);
+}
 
 
 
@@ -1101,7 +1169,6 @@ bool Directory::addItems(const QString& path)
 	for (const auto& entry : entries)
 	{
 		if (FileBrowser::excludedPaths().contains(entry.absoluteFilePath())) { continue; }
-
 		QString fileName = entry.fileName();
 		if (entry.isDir())
 		{
@@ -1115,9 +1182,7 @@ bool Directory::addItems(const QString& path)
 			addChild(fileItem);
 		}
 	}
-	
 	treeWidget()->setUpdatesEnabled(true);
-	
 	// return true if we added any child items
 	return childCount() > 0;
 }

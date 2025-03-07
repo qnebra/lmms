@@ -299,8 +299,19 @@ void ConfigManager::setBackgroundPicFile(const QString & backgroundPicFile)
 	m_backgroundPicFile = backgroundPicFile;
 }
 
+const QString& ConfigManager::removeTrailingSeparators(QString& path)
+{
+	const QStringList separators = {"/", "\\"};
 
+	while (!path.isEmpty() && std::find_if(separators.begin(), separators.end(), [&](const QString& separator) {
+		return path.endsWith(separator);
+	}) != separators.end())
+	{
+		path.chop(1);
+	}
 
+	return path;
+}
 
 void ConfigManager::createWorkingDir()
 {
@@ -333,6 +344,34 @@ void ConfigManager::addRecentlyOpenedProject(const QString & file)
 		m_recentlyOpenedProjects.push_front(file);
 		ConfigManager::inst()->saveConfigFile();
 	}
+}
+
+
+
+
+void ConfigManager::addFavoriteItem(QString& item)
+{
+	item = QDir::toNativeSeparators(removeTrailingSeparators(item));
+
+	auto instance = inst();
+	instance->m_favoriteItems.push_back(item);
+	instance->saveConfigFile();
+}
+
+void ConfigManager::removeFavoriteItem(QString& item)
+{
+	item = QDir::toNativeSeparators(removeTrailingSeparators(item));
+
+	auto instance = inst();
+	instance->m_favoriteItems.removeAll(item);
+	instance->saveConfigFile();
+}
+
+bool ConfigManager::isFavorite(QString & item)
+{
+	const auto items = inst()->favoriteItems();
+	const auto it = std::find_if(items.begin(), items.end(), [&](const auto& favoriteItem) { return QFileInfo{item} == QFileInfo{favoriteItem}; });
+	return it != items.end();
 }
 
 
@@ -468,6 +507,19 @@ void ConfigManager::loadConfigFile(const QString & configFile)
 						{
 							m_recentlyOpenedProjects <<
 									n.toElement().attribute("path");
+						}
+						n = n.nextSibling();
+					}
+				}
+				else if (node.nodeName() == "favoriteitems")
+				{
+					m_favoriteItems.clear();
+					QDomNode n = node.firstChild();
+					while (!n.isNull())
+					{
+						if (n.isElement() && n.toElement().hasAttributes())
+						{
+							m_favoriteItems << n.toElement().attribute("path");
 						}
 						n = n.nextSibling();
 					}
@@ -618,6 +670,17 @@ void ConfigManager::saveConfigFile()
 		recent_files.appendChild(n);
 	}
 	lmms_config.appendChild(recent_files);
+
+	QDomElement favorite_items = doc.createElement("favoriteitems");
+
+	for (const auto& favoriteItem : m_favoriteItems)
+	{
+		QDomElement n = doc.createElement("item");
+		n.setAttribute("path", favoriteItem);
+		favorite_items.appendChild(n);
+	}
+
+	lmms_config.appendChild(favorite_items);
 
 	QString xml = "<?xml version=\"1.0\"?>\n" + doc.toString(2);
 

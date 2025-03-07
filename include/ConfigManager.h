@@ -214,6 +214,11 @@ public:
 		return m_recentlyOpenedProjects;
 	}
 
+	const QStringList & favoriteItems() const
+	{
+		return m_favoriteItems;
+	}
+
 	QString localeDir() const
 	{
 		return m_dataDir + LOCALE_PATH;
@@ -240,6 +245,14 @@ public:
 
 	void addRecentlyOpenedProject(const QString & _file);
 
+	static void addFavoriteItem(QString& item);
+	static void removeFavoriteItem(QString& item);
+	static bool isFavorite(QString& item);
+	static QStringList getFavorites()
+	{
+		return inst()->favoriteItems();
+	}
+
 	QString value(const QString& cls, const QString& attribute, const QString& defaultVal = "") const;
 
 	void setValue(const QString & cls, const QString & attribute,
@@ -259,6 +272,7 @@ public:
 	void setGIGDir(const QString & gigDir);
 	void setThemeDir(const QString & themeDir);
 	void setBackgroundPicFile(const QString & backgroundPicFile);
+	static const QString& removeTrailingSeparators(QString& path);
 
 	// Creates the working directory & subdirectories on disk.
 	void createWorkingDir();
@@ -299,6 +313,7 @@ private:
 	QString m_version;
 	unsigned int m_configVersion;
 	QStringList m_recentlyOpenedProjects;
+	QStringList m_favoriteItems;
 
 	using stringPairVector = std::vector<QPair<QString, QString>>;
 	using settingsMap = QMap<QString, stringPairVector>;
