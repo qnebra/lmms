@@ -27,7 +27,6 @@
 #include "WaveShaper.h"
 #include "lmms_math.h"
 #include "embed.h"
-#include "interpolation.h"
 #include "VectorGraphModel.h"
 
 #include "plugin_export.h"
@@ -121,9 +120,7 @@ Effect::ProcessStatus WaveShaperEffect::processImpl(SampleFrame* buf, const fpp_
 			}
 			else if( lookup < 200 )
 			{
-				s[i] = linearInterpolate((*graphSamples)[lookup - 1],
-						(*graphSamples)[lookup], frac)
-						* posneg;
+				s[i] = std::lerp((*graphSamples)[lookup - 1], (*graphSamples)[lookup], frac) * posneg;
 			}
 			else
 			{
