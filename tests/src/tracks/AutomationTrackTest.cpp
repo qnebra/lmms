@@ -59,7 +59,7 @@ private slots:
 	{
 		using namespace lmms;
 
-		AutomationClip c(nullptr);
+		AutomationClip c;
 		c.setProgressionType(AutomationClip::ProgressionType::Linear);
 		c.putValue(0, 0.0, false);
 		c.putValue(100, 1.0, false);
@@ -76,7 +76,7 @@ private slots:
 	{
 		using namespace lmms;
 
-		AutomationClip c(nullptr);
+		AutomationClip c;
 		c.setProgressionType(AutomationClip::ProgressionType::Discrete);
 		c.putValue(0, 0.0, false);
 		c.putValue(100, 1.0, false);
@@ -95,10 +95,10 @@ private slots:
 
 		auto song = Engine::getSong();
 
-		AutomationTrack track(song);
+		AutomationTrack track;
 		song->addTrack(&track);
 
-		AutomationClip c1(&track);
+		AutomationClip c1;
 		track.addClip(&c1);
 
 		c1.setProgressionType(AutomationClip::ProgressionType::Linear);
@@ -107,7 +107,7 @@ private slots:
 		c1.movePosition(0);
 		c1.addObject(&model);
 
-		AutomationClip c2(&track);
+		AutomationClip c2;
 		track.addClip(&c2);
 
 		c2.setProgressionType(AutomationClip::ProgressionType::Linear);
@@ -116,7 +116,7 @@ private slots:
 		c2.movePosition(100);
 		c2.addObject(&model);
 
-		AutomationClip c3(&track);
+		AutomationClip c3;
 		track.addClip(&c3);
 
 		c3.addObject(&model);
@@ -139,10 +139,10 @@ private slots:
 
 		auto song = Engine::getSong();
 
-		AutomationTrack track(song);
+		AutomationTrack track;
 		song->addTrack(&track);
 
-		AutomationClip c(&track);
+		AutomationClip c;
 		track.addClip(&c);
 
 		c.setProgressionType(AutomationClip::ProgressionType::Linear);
@@ -168,10 +168,10 @@ private slots:
 
 		auto song = Engine::getSong();
 
-		InstrumentTrack instrumentTrack(song);
+		InstrumentTrack instrumentTrack;
 		song->addTrack(&instrumentTrack);
 
-		MidiClip midiClip(&instrumentTrack);
+		MidiClip midiClip;
 		instrumentTrack.addClip(&midiClip);
 
 		midiClip.changeLength(TimePos(4, 0));
@@ -197,10 +197,10 @@ private slots:
 		auto song = Engine::getSong();
 		auto patternStore = Engine::patternStore();
 
-		PatternTrack patternTrack(song);
+		PatternTrack patternTrack;
 		song->addTrack(&patternTrack);
 
-		AutomationTrack automationTrack(patternStore);
+		AutomationTrack automationTrack;
 		patternStore->addTrack(&automationTrack);
 
 		automationTrack.createClipsForPattern(patternStore->numOfPatterns() - 1);
@@ -221,13 +221,13 @@ private slots:
 		QCOMPARE(patternStore->automatedValuesAt(10, patternTrack.patternIndex())[&model], 1.0f);
 		QCOMPARE(patternStore->automatedValuesAt(50, patternTrack.patternIndex())[&model], 1.0f);
 
-		PatternTrack patternTrack2(song);
+		PatternTrack patternTrack2;
 		song->addTrack(&patternTrack2);
 
 		QCOMPARE(patternStore->automatedValuesAt(5, patternTrack.patternIndex())[&model], 0.5f);
 		QVERIFY(! patternStore->automatedValuesAt(5, patternTrack2.patternIndex()).size());
 
-		PatternClip clip(&patternTrack);
+		PatternClip clip{patternTrack.patternIndex()};
 		patternTrack.addClip(&clip);
 
 		clip.changeLength(TimePos::ticksPerBar() * 2);
@@ -248,13 +248,13 @@ private slots:
 
 		auto globalTrack = song->globalAutomationTrack();
 
-		AutomationClip globalClip(globalTrack);
+		AutomationClip globalClip;
 		globalTrack->addClip(&globalClip);
 
-		AutomationTrack localTrack(song);
+		AutomationTrack localTrack;
 		song->addTrack(&localTrack);
 
-		AutomationClip localClip(&localTrack);
+		AutomationClip localClip;
 		localTrack.addClip(&localClip);
 
 		FloatModel model;
