@@ -92,6 +92,7 @@ public slots:
 	void updatePosition();
 	void updatePositionLine();
 	void selectAllClips( bool select );
+	void updateSnapSizes();
 
 protected:
 	void closeEvent( QCloseEvent * ce ) override;
@@ -151,6 +152,7 @@ private:
 	IntModel* m_zoomingModel;
 	ComboBoxModel* m_snappingModel;
 	bool m_proportionalSnap;
+	std::vector<float> m_snapSizes;
 
 	EditMode m_mode;
 	EditMode m_ctrlMode; // mode they were in before they hit ctrl
