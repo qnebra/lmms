@@ -27,68 +27,68 @@
 
 #include <QString>
 #include <memory>
+#include <optional>
 #include <vector>
 
-#include "AudioEngine.h"
-#include "Engine.h"
 #include "LmmsTypes.h"
+#include "SampleFrame.h"
 #include "lmms_export.h"
 
 namespace lmms {
+
+struct SampleBufferData
+{
+	std::vector<SampleFrame> data;
+	std::optional<QString> audioFilePath = std::nullopt; // TODO: Use std::filesystem::path
+	sample_rate_t sampleRate = 0;
+};
+
+//! @class SampleBuffer
+//! @brief Represents an immutable, stereo interleaved audio buffer.
 class LMMS_EXPORT SampleBuffer
 {
 public:
-	using value_type = SampleFrame;
-	using reference = SampleFrame&;
-	using const_reference = const SampleFrame&;
-	using iterator = std::vector<SampleFrame>::iterator;
-	using const_iterator = std::vector<SampleFrame>::const_iterator;
-	using difference_type = std::vector<SampleFrame>::difference_type;
-	using size_type = std::vector<SampleFrame>::size_type;
-	using reverse_iterator = std::vector<SampleFrame>::reverse_iterator;
-	using const_reverse_iterator = std::vector<SampleFrame>::const_reverse_iterator;
-
+	//! Constructs an empty buffer with no sample rate.
 	SampleBuffer() = default;
+
+	//! Constructs a buffer from the file @a audioFile on disk.
+	//! @throws If an error occurred while loading the audio file.
 	explicit SampleBuffer(const QString& audioFile);
-	SampleBuffer(const QString& base64, int sampleRate);
-	SampleBuffer(std::vector<SampleFrame> data, int sampleRate);
-	SampleBuffer(
-		const SampleFrame* data, size_t numFrames, int sampleRate = Engine::audioEngine()->outputSampleRate());
 
-	friend void swap(SampleBuffer& first, SampleBuffer& second) noexcept;
+	//! Constructs a buffer from the given audio Base64 string @a base64 with a sample rate of @a sampleRate.
+	//! @note The Base64 string is expected to contain stereo floating point audio data.
+	SampleBuffer(const QString& base64, sample_rate_t sampleRate);
+
+	//! Constructs a buffer with size of @a numFrames and a sample rate of @a sampleRate from the raw @a data.
+	SampleBuffer(const SampleFrame* data, f_cnt_t numFrames, sample_rate_t sampleRate);
+
+	//! Constructs a silent buffer with a size of @a numFrames and a sample Rate of @a sampleRate.
+	SampleBuffer(f_cnt_t numFrames, sample_rate_t sampleRate);
+
+	//! Converts the buffer to a Base64 string representation.
 	auto toBase64() const -> QString;
+	
+	//! @returns a reference to the audio frame at the given @a index.
+	auto operator[](f_cnt_t index) const -> const SampleFrame& { return m_data->data[index]; }
 
-	auto audioFile() const -> const QString& { return m_audioFile; }
-	auto sampleRate() const -> sample_rate_t { return m_sampleRate; }
+	//! @returns the path to the audio file if the buffer was loaded from one (otherwise, an empty string is returned).
+	auto audioFilePath() const -> QString { return m_data->audioFilePath.value_or(QString{}); }
 
-	auto begin() -> iterator { return m_data.begin(); }
-	auto end() -> iterator { return m_data.end(); }
+	//! @returns an immutable raw pointer to the audio data.
+	auto data() const -> const SampleFrame* { return m_data->data.data(); }
 
-	auto begin() const -> const_iterator { return m_data.begin(); }
-	auto end() const -> const_iterator { return m_data.end(); }
+	//! @returns true if the buffer has no audio frames, false otherwise.
+	auto empty() const -> bool { return m_data->data.size() == 0; }
 
-	auto cbegin() const -> const_iterator { return m_data.cbegin(); }
-	auto cend() const -> const_iterator { return m_data.cend(); }
+	//! @returns the associated sample rate with this buffer.
+	auto sampleRate() const -> sample_rate_t { return m_data->sampleRate; }
 
-	auto rbegin() -> reverse_iterator { return m_data.rbegin(); }
-	auto rend() -> reverse_iterator { return m_data.rend(); }
-
-	auto rbegin() const -> const_reverse_iterator { return m_data.rbegin(); }
-	auto rend() const -> const_reverse_iterator { return m_data.rend(); }
-
-	auto crbegin() const -> const_reverse_iterator { return m_data.crbegin(); }
-	auto crend() const -> const_reverse_iterator { return m_data.crend(); }
-
-	auto data() const -> const SampleFrame* { return m_data.data(); }
-	auto size() const -> size_type { return m_data.size(); }
-	auto empty() const -> bool { return m_data.empty(); }
-
-	static auto emptyBuffer() -> std::shared_ptr<const SampleBuffer>;
+	//! @returns the number of audio frames within the buffer.
+	auto numFrames() const -> f_cnt_t { return m_data->data.size(); }
 
 private:
-	std::vector<SampleFrame> m_data;
-	QString m_audioFile;
-	sample_rate_t m_sampleRate = Engine::audioEngine()->outputSampleRate();
+	static auto emptyData() -> std::shared_ptr<const SampleBufferData>;
+	std::shared_ptr<const SampleBufferData> m_data = emptyData();
 };
 
 } // namespace lmms

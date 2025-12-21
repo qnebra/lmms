@@ -129,7 +129,8 @@ void SampleClipView::dropEvent( QDropEvent * _de )
 	}
 	else if( StringPairDrag::decodeKey( _de ) == "sampledata" )
 	{
-		m_clip->setSampleBuffer(SampleLoader::createBufferFromBase64(StringPairDrag::decodeValue(_de)));
+		m_clip->setSampleBuffer(SampleLoader::createBufferFromBase64(
+			StringPairDrag::decodeValue(_de), Engine::audioEngine()->outputSampleRate()));
 		m_clip->updateLength();
 		update();
 		_de->accept();
@@ -189,17 +190,9 @@ void SampleClipView::mouseDoubleClickEvent( QMouseEvent * )
 	if (m_trackView->trackContainerView()->knifeMode()) { return; }
 
 	const QString selectedAudioFile = SampleLoader::openAudioFile();
-
 	if (selectedAudioFile.isEmpty()) { return; }
-	
-	if (!m_clip->hasSampleFileLoaded(selectedAudioFile))
-	{
-		auto sampleBuffer = SampleLoader::createBufferFromFile(selectedAudioFile);
-		if (sampleBuffer != SampleBuffer::emptyBuffer())
-		{
-			m_clip->setSampleBuffer(sampleBuffer);
-		}
-	}
+
+	m_clip->setSampleFile(selectedAudioFile);
 	m_clip->updateLength();
 }
 

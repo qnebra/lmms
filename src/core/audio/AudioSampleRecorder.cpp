@@ -66,7 +66,7 @@ f_cnt_t AudioSampleRecorder::framesRecorded() const
 	return frames;
 }
 
-std::shared_ptr<const SampleBuffer> AudioSampleRecorder::createSampleBuffer()
+SampleBuffer AudioSampleRecorder::createSampleBuffer()
 {
 	const f_cnt_t frames = framesRecorded();
 	// create buffer to store all recorded buffers in
@@ -76,12 +76,12 @@ std::shared_ptr<const SampleBuffer> AudioSampleRecorder::createSampleBuffer()
 	auto framesCopied = 0;
 	for (const auto& [buf, numFrames] : m_buffers)
 	{
-		std::copy_n(buf, numFrames, bigBuffer.begin() + framesCopied);
+		std::copy_n(buf, numFrames, bigBuffer.data() + framesCopied);
 		framesCopied += numFrames;
 	}
 
 	// create according sample-buffer out of big buffer
-	return std::make_shared<const SampleBuffer>(std::move(bigBuffer), sampleRate());
+	return SampleBuffer{bigBuffer.data(), bigBuffer.size(), sampleRate()};
 }
 
 void AudioSampleRecorder::writeBuffer(const SampleFrame* _ab, const fpp_t _frames)

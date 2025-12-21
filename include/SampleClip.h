@@ -54,7 +54,7 @@ public:
 	SampleClip& operator=( const SampleClip& that ) = delete;
 
 	void changeLength( const TimePos & _length ) override;
-	const QString& sampleFile() const;
+	QString sampleFile() const;
 	bool hasSampleFileLoaded(const QString & filename) const;
 
 	void saveSettings( QDomDocument & _doc, QDomElement & _parent ) override;
@@ -77,7 +77,7 @@ public:
 
 	bool isPlaying() const;
 	void setIsPlaying(bool isPlaying);
-	void setSampleBuffer(std::shared_ptr<const SampleBuffer> sb);
+	void setSampleBuffer(const SampleBuffer& sb);
 
 	SampleClip* clone() override
 	{
