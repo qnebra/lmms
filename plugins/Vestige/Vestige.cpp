@@ -1,4 +1,4 @@
-/*
+ /*
  * Vestige.cpp - instrument-plugin for hosting VST-instruments
  *
  * Copyright (c) 2005-2014 Tobias Doerffel <tobydox/at/users.sourceforge.net>
@@ -419,11 +419,19 @@ void VestigeInstrument::play( SampleFrame* _buf )
 
 bool VestigeInstrument::handleMidiEvent( const MidiEvent& event, const TimePos& time, f_cnt_t offset )
 {
-	m_pluginMutex.lock();
+	// Keep behavior consistent with play(): don't block the audio/MIDI thread.
+	// Use tryLock with the same timeout policy as play().
+	if (!m_pluginMutex.tryLock( Engine::getSong()->isExporting() ? -1 : 0 )) {
+		// Couldn't obtain lock immediately (and we are not allowed to block) —
+		// skip the event to avoid stalling the audio thread.
+		return true;
+	}
+
 	if( m_plugin != nullptr )
 	{
 		m_plugin->processMidiEvent( event, offset );
 	}
+
 	m_pluginMutex.unlock();
 
 	return true;
@@ -494,7 +502,7 @@ VestigeInstrumentView::VestigeInstrumentView( Instrument * _instrument,
 	InstrumentViewFixedSize( _instrument, _parent ),
 	lastPosInMenu (0)
 {
-	m_openPluginButton = new PixmapButton(this);
+	m_openPluginButton = new PixmapButton( this, "" );
 	m_openPluginButton->setCheckable( false );
 	m_openPluginButton->setCursor( Qt::PointingHandCursor );
 	m_openPluginButton->move( 216, 81 );
@@ -506,7 +514,7 @@ VestigeInstrumentView::VestigeInstrumentView( Instrument * _instrument,
 						SLOT( openPlugin() ) );
 	m_openPluginButton->setToolTip(tr("Open VST plugin"));
 
-	m_managePluginButton = new PixmapButton(this);
+	m_managePluginButton = new PixmapButton( this, "" );
 	m_managePluginButton->setCheckable( false );
 	m_managePluginButton->setCursor( Qt::PointingHandCursor );
 	m_managePluginButton->move( 216, 101 );
@@ -519,7 +527,7 @@ VestigeInstrumentView::VestigeInstrumentView( Instrument * _instrument,
 	m_managePluginButton->setToolTip(tr("Control VST plugin from LMMS host"));
 
 
-	m_openPresetButton = new PixmapButton(this);
+	m_openPresetButton = new PixmapButton( this, "" );
 	m_openPresetButton->setCheckable( false );
 	m_openPresetButton->setCursor( Qt::PointingHandCursor );
 	m_openPresetButton->move( 200, 224 );
@@ -543,7 +551,7 @@ VestigeInstrumentView::VestigeInstrumentView( Instrument * _instrument,
 	m_rolLPresetButton->setShortcut( Qt::Key_Minus );
 
 
-	m_savePresetButton = new PixmapButton(this);
+	m_savePresetButton = new PixmapButton( this, "" );
 	m_savePresetButton->setCheckable( false );
 	m_savePresetButton->setCursor( Qt::PointingHandCursor );
 	m_savePresetButton->move( 224, 224 );
@@ -636,7 +644,7 @@ void VestigeInstrumentView::updateMenu( void )
 
      		for (int i = 0; i < list1.size(); i++) {
 			presetActions[i] = new QAction(this);
-			connect(presetActions[i], SIGNAL(triggered()), this, SLOT(selPreset()));
+			connect(presetActions[i], SIGNAL(triggered()), this, SLOT(selPreset());
 
         		presetActions[i]->setText(QString("%1. %2").arg(QString::number(i+1), list1.at(i)));
         		presetActions[i]->setData(i);
@@ -869,41 +877,70 @@ void VestigeInstrumentView::paintEvent( QPaintEvent * )
 {
 	QPainter p( this );
 
+	// Keep painting fast and side-effect free:
+	// - cache artwork and fonts in static locals to avoid re-allocating each paint
+	// - cache plugin query results (name/vendor/program) and only refresh when plugin pointer changes
+	// - avoid unconditionally calling setWindowTitle() every paint (compare first)
+
 	static auto s_artwork = PLUGIN_NAME::getIconPixmap("artwork");
 	p.drawPixmap(0, 0, s_artwork);
 
-	QString plugin_name = ( m_vi->m_plugin != nullptr ) ?
-				m_vi->m_plugin->name()/* + QString::number(
-						m_plugin->version() )*/
-					:
-				tr( "No VST plugin loaded" );
-	QFont f = p.font();
-	f.setBold( true );
-	p.setFont(adjustedToPixelSize(f, DEFAULT_FONT_SIZE));
-	p.setPen( QColor( 255, 255, 255 ) );
-	p.drawText( 10, 100, plugin_name );
+	// Cached query results and fonts (initialized once)
+	static VstPlugin *s_lastPlugin = nullptr;
+	static QString s_cachedPluginName = tr("No VST plugin loaded");
+	static QString s_cachedVendor;
+	static QString s_cachedProgram;
+	static bool s_fontsInit = false;
+	static QFont s_boldFontCached;
+	static QFont s_smallFontCached;
 
-	p.setPen( QColor( 50, 50, 50 ) );
-	p.drawText( 10, 211, tr( "Preset" ) );
-
-//	m_pluginMutex.lock();
-	if( m_vi->m_plugin != nullptr )
-	{
-		p.setPen( QColor( 0, 0, 0 ) );
-		f.setBold( false );
-		p.setFont(adjustedToPixelSize(f, SMALL_FONT_SIZE));
-		p.drawText( 10, 114, tr( "by " ) +
-					m_vi->m_plugin->vendorString() );
-		p.setPen( QColor( 255, 255, 255 ) );
-		p.drawText( 10, 225, m_vi->m_plugin->currentProgramName() );
+	if (!s_fontsInit) {
+		QFont f = p.font();
+		f.setBold(true);
+		s_boldFontCached = adjustedToPixelSize(f, DEFAULT_FONT_SIZE);
+		QFont fsmall = p.font();
+		fsmall.setBold(false);
+		s_smallFontCached = adjustedToPixelSize(fsmall, SMALL_FONT_SIZE);
+		s_fontsInit = true;
 	}
 
-	if( m_vi->m_subWindow != nullptr )
-	{
-		m_vi->m_subWindow->setWindowTitle( m_vi->instrumentTrack()->name()
-								+ tr( " - VST plugin control" ) );
+	VstPlugin* plugin = (m_vi ? m_vi->m_plugin : nullptr);
+	if (plugin != s_lastPlugin) {
+		s_lastPlugin = plugin;
+		if (plugin) {
+			// These calls may be non-trivial; only do them when plugin changes.
+			s_cachedPluginName = plugin->name();
+			s_cachedVendor = plugin->vendorString();
+			s_cachedProgram = plugin->currentProgramName();
+		} else {
+			s_cachedPluginName = tr("No VST plugin loaded");
+			s_cachedVendor.clear();
+			s_cachedProgram.clear();
+		}
 	}
-//	m_pluginMutex.unlock();
+
+	p.setFont(s_boldFontCached);
+	p.setPen(QColor(255, 255, 255));
+	p.drawText(10, 100, s_cachedPluginName);
+
+	p.setPen(QColor(50, 50, 50));
+	p.drawText(10, 211, tr("Preset"));
+
+	if (plugin != nullptr) {
+		p.setPen(QColor(0, 0, 0));
+		p.setFont(s_smallFontCached);
+		p.drawText(10, 114, tr("by ") + s_cachedVendor);
+		p.setPen(QColor(255, 255, 255));
+		p.drawText(10, 225, s_cachedProgram);
+	}
+
+	// Update subwindow title only when it actually changed to avoid reflows
+	if (m_vi && m_vi->m_subWindow) {
+		const QString want = m_vi->instrumentTrack()->name() + tr(" - VST plugin control");
+		if (m_vi->m_subWindow->windowTitle() != want) {
+			m_vi->m_subWindow->setWindowTitle(want);
+		}
+	}
 }
 
 
@@ -1052,8 +1089,8 @@ void ManageVestigeInstrumentView::syncPlugin( void )
 			std::snprintf(paramStr.data(), paramStr.size(), "param%d", i);
 			s_dumpValues = dump[paramStr.data()].split(":");
 			float f_value = LocaleHelper::toFloat(s_dumpValues.at(2));
-			m_vi->knobFModel[i]->setValue(f_value, true);
-			m_vi->knobFModel[i]->setInitValue(f_value);
+			m_vi->knobFModel[ i ]->setAutomatedValue( f_value );
+			m_vi->knobFModel[ i ]->setInitValue( f_value );
 		}
 	}
 	syncParameterText();
