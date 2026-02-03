@@ -101,8 +101,8 @@ bool AutomationClip::addObject( AutomatableModel * _obj, bool _search_dup )
 		// the automation track is unconnected and there is nothing in the track
 		if (m_objects.empty() && hasAutomation() == false)
 		{
-			// then initialize first value
-			putValue( TimePos(0), _obj->inverseScaledValue( _obj->value<float>() ), false );
+			// then initialize first value - call unlocked version since we already hold the lock
+			putValueUnlocked( TimePos(0), _obj->inverseScaledValue( _obj->value<float>() ), false );
 		}
 
 		m_objects.push_back(_obj);
@@ -221,6 +221,292 @@ void AutomationClip::updateLength()
 
 
 
+// Private helper method - must be called with m_clipMutex already locked (read or write)
+float AutomationClip::valueAtUnlocked( const TimePos & _time ) const
+{
+	if( m_timeMap.isEmpty() )
+	{
+		return 0;
+	}
+
+	// If we have a node at that time, just return its value
+	if (m_timeMap.contains(_time))
+	{
+		// When the time is exactly the node's time, we want the inValue
+		return m_timeMap[_time].getInValue();
+	}
+
+	// lowerBound returns next value with equal or greater key. Since we already
+	// checked if the key contains a node, we know the returned node has a greater
+	// key than _time. Therefore we take the previous element to calculate the current value
+	timeMap::const_iterator v = m_timeMap.lowerBound(_time);
+
+	if( v == m_timeMap.begin() )
+	{
+		return 0;
+	}
+
+	const auto pv = std::prev(v);
+
+	if( v == m_timeMap.end() )
+	{
+		// When the time is after the last node, we want the outValue of it
+		return OUTVAL(pv);
+	}
+
+	return valueAtUnlocked(pv, _time - POS(pv));
+}
+
+// Private helper method - must be called with m_clipMutex already locked (read or write)
+float AutomationClip::valueAtUnlocked( timeMap::const_iterator v, int offset ) const
+{
+	// We never use it with offset 0, but doesn't hurt to return a correct
+	// value if we do
+	if (offset == 0) { return INVAL(v); }
+
+	if (m_progressionType == ProgressionType::Discrete)
+	{
+		return OUTVAL(v);
+	}
+	else if( m_progressionType == ProgressionType::Linear )
+	{
+		auto const nv = std::next(v);
+		float slope =
+			(INVAL(nv) - OUTVAL(v))
+			/ (POS(nv) - POS(v));
+
+		return OUTVAL(v) + offset * slope;
+	}
+	else /* ProgressionType::CubicHermite */
+	{
+		// Implements a Cubic Hermite spline as explained at:
+		// http://en.wikipedia.org/wiki/Cubic_Hermite_spline#Unit_interval_.280.2C_1.29
+		//
+		// Note that we are not interpolating a 2 dimensional point over
+		// time as the article describes.  We are interpolating a single
+		// value: y.  To make this work we map the values of x that this
+		// segment spans to values of t for t = 0.0 -> 1.0 and scale the
+		// tangents _m1 and _m2
+		auto const nv = std::next(v);
+
+		int numValues = (POS(nv) - POS(v));
+		float t = (float) offset / (float) numValues;
+		float m1 = OUTTAN(v) * numValues * m_tension;
+		float m2 = INTAN(nv) * numValues * m_tension;
+
+		auto t2 = t * t, t3 = t2 * t;
+		return (2 * t3 - 3 * t2 + 1) * OUTVAL(v)
+			+ (t3 - 2 * t2 + t) * m1
+			+ (-2 * t3 + 3 * t2) * INVAL(nv)
+			+ (t3 - t2) * m2;
+	}
+}
+
+// Private helper method - must be called with m_clipMutex already write-locked
+void AutomationClip::cleanObjectsUnlocked()
+{
+	for( objectVector::iterator it = m_objects.begin(); it != m_objects.end(); )
+	{
+		if( *it )
+		{
+			++it;
+		}
+		else
+		{
+			it = m_objects.erase( it );
+		}
+	}
+}
+
+// Private helper method - must be called with m_clipMutex already write-locked
+void AutomationClip::generateTangentsUnlocked(timeMap::iterator it, int numToGenerate)
+{
+	for (int i = 0; i < numToGenerate && it != m_timeMap.end(); ++i, ++it)
+	{
+		// Skip the node if it has locked tangents (were manually edited)
+		if (LOCKEDTAN(it))
+		{
+			continue;
+		}
+
+		auto const nit = std::next(it);
+
+		if (nit == m_timeMap.end())
+		{
+			// Previously, the last value's tangent was always set to 0. That logic was kept for both tangents
+			// of the last node
+			it.value().setInTangent(0);
+			it.value().setOutTangent(0);
+		}
+		else if (it == m_timeMap.begin())
+		{
+			// On the first node there's no curve behind it, so we will only calculate the outTangent
+			// and inTangent will be set to 0.
+			float tangent = (INVAL(nit) - OUTVAL(it)) / (POS(nit) - POS(it));
+			it.value().setInTangent(0);
+			it.value().setOutTangent(tangent);
+		}
+		else
+		{
+			// When we are in a node that is in the middle of two other nodes, we need to check if we
+			// have a discrete jump at this node. If we do not, then we can calculate the tangents normally.
+			// If we do have a discrete jump, then we have to calculate the tangents differently for each side
+			// of the curve.
+			// TODO: This behavior means that a very small difference between the inValue and outValue can
+			// result in a big change in the curve. In the future, allowing the user to manually adjust
+			// the tangents would be better.
+
+			auto const pit = std::prev(it);
+
+			if (OFFSET(it) == 0)
+			{
+				float inTangent = (INVAL(nit) - OUTVAL(pit)) / (POS(nit) - POS(pit));
+				it.value().setInTangent(inTangent);
+				// inTangent == outTangent in this case
+				it.value().setOutTangent(inTangent);
+			}
+			else
+			{
+				// Calculate the left side of the curve
+				float inTangent = (INVAL(it) - OUTVAL(pit)) / (POS(it) - POS(pit));
+				// Calculate the right side of the curve
+				float outTangent = (INVAL(nit) - OUTVAL(it)) / (POS(nit) - POS(it));
+				it.value().setInTangent(inTangent);
+				it.value().setOutTangent(outTangent);
+			}
+		}
+	}
+}
+
+// Private helper method - must be called with m_clipMutex already write-locked
+void AutomationClip::generateTangentsUnlocked()
+{
+	generateTangentsUnlocked(m_timeMap.begin(), m_timeMap.size());
+}
+
+// Private helper method - must be called with m_clipMutex already write-locked
+void AutomationClip::removeNodeUnlocked(const TimePos & time)
+{
+	cleanObjectsUnlocked();
+
+	m_timeMap.remove( time );
+	timeMap::iterator it = m_timeMap.lowerBound(time);
+	if( it != m_timeMap.begin() )
+	{
+		--it;
+	}
+	generateTangentsUnlocked(it, 3);
+
+	updateLength();
+}
+
+// Private helper method - must be called with m_clipMutex already write-locked  
+void AutomationClip::removeNodesUnlocked(const int tick0, const int tick1)
+{
+	if (tick0 == tick1)
+	{
+		removeNodeUnlocked(TimePos(tick0));
+		return;
+	}
+
+	auto start = TimePos(std::min(tick0, tick1));
+	auto end = TimePos(std::max(tick0, tick1));
+
+	// Make a list of TimePos with nodes to be removed
+	// because we can't simply remove the nodes from
+	// the timeMap while we are iterating it.
+	std::vector<TimePos> nodesToRemove;
+
+	for (auto it = m_timeMap.lowerBound(start), endIt = m_timeMap.upperBound(end); it != endIt; ++it)
+	{
+		nodesToRemove.push_back(POS(it));
+	}
+
+	for (auto node: nodesToRemove)
+	{
+		removeNodeUnlocked(node);
+	}
+}
+
+// Private helper method - must be called with m_clipMutex already write-locked
+TimePos AutomationClip::putValueUnlocked(
+	const TimePos & time,
+	const float value,
+	const bool quantPos,
+	const bool ignoreSurroundingPoints
+)
+{
+	cleanObjectsUnlocked();
+
+	TimePos newTime = quantPos ? Note::quantized(time, quantization()) : time;
+	newTime = std::max(TimePos(0), newTime);
+
+	// Create a node or replace the existing one on newTime
+	m_timeMap[newTime] = AutomationNode(this, value, newTime);
+
+	timeMap::iterator it = m_timeMap.find(newTime);
+
+	// Remove control points that are covered by the new points
+	// quantization value. Control Key to override
+	if (!ignoreSurroundingPoints)
+	{
+		// We need to check that to avoid removing nodes from
+		// newTime + 1 to newTime (removing the node we are adding)
+		if (quantization() > 1)
+		{
+			// Remove nodes between the quantization points, them not
+			// being included
+			removeNodesUnlocked(newTime + 1, newTime + quantization() - 1);
+		}
+	}
+	if (it != m_timeMap.begin()) { --it; }
+	generateTangentsUnlocked(it, 3);
+
+	updateLength();
+
+	return newTime;
+}
+
+// Private helper method - must be called with m_clipMutex already write-locked
+TimePos AutomationClip::putValuesUnlocked(
+	const TimePos & time,
+	const float inValue,
+	const float outValue,
+	const bool quantPos,
+	const bool ignoreSurroundingPoints
+)
+{
+	cleanObjectsUnlocked();
+
+	TimePos newTime = quantPos ? Note::quantized(time, quantization()) : time;
+	newTime = std::max(TimePos(0), newTime);
+
+	// Create a node or replace the existing one on newTime
+	m_timeMap[newTime] = AutomationNode(this, inValue, outValue, newTime);
+
+	timeMap::iterator it = m_timeMap.find(newTime);
+
+	// Remove control points that are covered by the new points
+	// quantization value. Control Key to override
+	if (!ignoreSurroundingPoints)
+	{
+		// We need to check that to avoid removing nodes from
+		// newTime + 1 to newTime (removing the node we are adding)
+		if (quantization() > 1)
+		{
+			// Remove nodes between the quantization points, them not
+			// being included
+			removeNodesUnlocked(newTime + 1, newTime + quantization() - 1);
+		}
+	}
+	if (it != m_timeMap.begin()) { --it; }
+	generateTangentsUnlocked(it, 3);
+
+	updateLength();
+
+	return newTime;
+}
+
 /**
  * @brief Puts an automation node on the timeMap with the given value.
  *        The inValue and outValue of the created node will be the same.
@@ -240,34 +526,7 @@ TimePos AutomationClip::putValue(
 	TimePos newTime;
 	{
 		QWriteLocker m(&m_clipMutex);
-
-		cleanObjects();
-
-		newTime = quantPos ? Note::quantized(time, quantization()) : time;
-		newTime = std::max(TimePos(0), newTime);
-
-		// Create a node or replace the existing one on newTime
-		m_timeMap[newTime] = AutomationNode(this, value, newTime);
-
-		timeMap::iterator it = m_timeMap.find(newTime);
-
-		// Remove control points that are covered by the new points
-		// quantization value. Control Key to override
-		if (!ignoreSurroundingPoints)
-		{
-			// We need to check that to avoid removing nodes from
-			// newTime + 1 to newTime (removing the node we are adding)
-			if (quantization() > 1)
-			{
-				// Remove nodes between the quantization points, them not
-				// being included
-				removeNodes(newTime + 1, newTime + quantization() - 1);
-			}
-		}
-		if (it != m_timeMap.begin()) { --it; }
-		generateTangents(it, 3);
-
-		updateLength();
+		newTime = putValueUnlocked(time, value, quantPos, ignoreSurroundingPoints);
 	}
 
 	// Emit signal outside critical section
@@ -300,34 +559,7 @@ TimePos AutomationClip::putValues(
 	TimePos newTime;
 	{
 		QWriteLocker m(&m_clipMutex);
-
-		cleanObjects();
-
-		newTime = quantPos ? Note::quantized(time, quantization()) : time;
-		newTime = std::max(TimePos(0), newTime);
-
-		// Create a node or replace the existing one on newTime
-		m_timeMap[newTime] = AutomationNode(this, inValue, outValue, newTime);
-
-		timeMap::iterator it = m_timeMap.find(newTime);
-
-		// Remove control points that are covered by the new points
-		// quantization value. Control Key to override
-		if (!ignoreSurroundingPoints)
-		{
-			// We need to check that to avoid removing nodes from
-			// newTime + 1 to newTime (removing the node we are adding)
-			if (quantization() > 1)
-			{
-				// Remove nodes between the quantization points, them not
-				// being included
-				removeNodes(newTime + 1, newTime + quantization() - 1);
-			}
-		}
-		if (it != m_timeMap.begin()) { --it; }
-		generateTangents(it, 3);
-
-		updateLength();
+		newTime = putValuesUnlocked(time, inValue, outValue, quantPos, ignoreSurroundingPoints);
 	}
 
 	// Emit signal outside critical section
@@ -343,18 +575,7 @@ void AutomationClip::removeNode(const TimePos & time)
 {
 	{
 		QWriteLocker m(&m_clipMutex);
-
-		cleanObjects();
-
-		m_timeMap.remove( time );
-		timeMap::iterator it = m_timeMap.lowerBound(time);
-		if( it != m_timeMap.begin() )
-		{
-			--it;
-		}
-		generateTangents(it, 3);
-
-		updateLength();
+		removeNodeUnlocked(time);
 	}
 
 	// Emit signal outside critical section
@@ -406,6 +627,8 @@ void AutomationClip::removeNodes(const int tick0, const int tick1)
  */
 void AutomationClip::resetNodes(const int tick0, const int tick1)
 {
+	QWriteLocker m(&m_clipMutex);
+
 	if (tick0 == tick1)
 	{
 		auto it = m_timeMap.find(TimePos(tick0));
@@ -427,13 +650,15 @@ void AutomationClip::resetNodes(const int tick0, const int tick1)
 
 void AutomationClip::resetTangents(const int tick0, const int tick1)
 {
+	QWriteLocker m(&m_clipMutex);
+
 	if (tick0 == tick1)
 	{
 		auto it = m_timeMap.find(TimePos(tick0));
 		if (it != m_timeMap.end())
 		{
 			it.value().setLockedTangents(false);
-			generateTangents(it, 1);
+			generateTangentsUnlocked(it, 1);
 		}
 		return;
 	}
@@ -444,7 +669,7 @@ void AutomationClip::resetTangents(const int tick0, const int tick1)
 	for (auto it = m_timeMap.lowerBound(start), endIt = m_timeMap.upperBound(end); it != endIt; ++it)
 	{
 		it.value().setLockedTangents(false);
-		generateTangents(it, 1);
+		generateTangentsUnlocked(it, 1);
 	}
 }
 
@@ -457,12 +682,12 @@ void AutomationClip::recordValue(TimePos time, float value)
 
 	if( value != m_lastRecordedValue )
 	{
-		putValue(time - startTimeOffset(), value, true);
+		putValueUnlocked(time - startTimeOffset(), value, true);
 		m_lastRecordedValue = value;
 	}
-	else if( valueAt(time - startTimeOffset()) != value )
+	else if( valueAtUnlocked(time - startTimeOffset()) != value )
 	{
-		removeNode(time - startTimeOffset());
+		removeNodeUnlocked(time - startTimeOffset());
 	}
 }
 
@@ -523,7 +748,7 @@ TimePos AutomationClip::setDragValue(
 			}
 		}
 
-		this->removeNode(newTime);
+		removeNodeUnlocked(newTime);
 		m_oldTimeMap = m_timeMap;
 		m_dragging = true;
 	}
@@ -531,17 +756,17 @@ TimePos AutomationClip::setDragValue(
 	//Restore to the state before it the point were being dragged
 	m_timeMap = m_oldTimeMap;
 
-	generateTangents();
+	generateTangentsUnlocked();
 
 	TimePos returnedPos;
 
 	if (m_dragKeepOutValue)
 	{
-		returnedPos = this->putValues(time, value, m_dragOutValue, quantPos, controlKey);
+		returnedPos = putValuesUnlocked(time, value, m_dragOutValue, quantPos, controlKey);
 	}
 	else
 	{
-		returnedPos = this->putValue(time, value, quantPos, controlKey);
+		returnedPos = putValueUnlocked(time, value, quantPos, controlKey);
 	}
 
 	// Set the tangents on the newly created node if they were locked
@@ -579,38 +804,7 @@ void AutomationClip::applyDragValue()
 float AutomationClip::valueAt( const TimePos & _time ) const
 {
 	QReadLocker m(&m_clipMutex);
-
-	if( m_timeMap.isEmpty() )
-	{
-		return 0;
-	}
-
-	// If we have a node at that time, just return its value
-	if (m_timeMap.contains(_time))
-	{
-		// When the time is exactly the node's time, we want the inValue
-		return m_timeMap[_time].getInValue();
-	}
-
-	// lowerBound returns next value with equal or greater key. Since we already
-	// checked if the key contains a node, we know the returned node has a greater
-	// key than _time. Therefore we take the previous element to calculate the current value
-	timeMap::const_iterator v = m_timeMap.lowerBound(_time);
-
-	if( v == m_timeMap.begin() )
-	{
-		return 0;
-	}
-
-	const auto pv = std::prev(v);
-
-	if( v == m_timeMap.end() )
-	{
-		// When the time is after the last node, we want the outValue of it
-		return OUTVAL(pv);
-	}
-
-	return valueAt(pv, _time - POS(pv));
+	return valueAtUnlocked(_time);
 }
 
 
@@ -621,47 +815,7 @@ float AutomationClip::valueAt( const TimePos & _time ) const
 float AutomationClip::valueAt( timeMap::const_iterator v, int offset ) const
 {
 	QReadLocker m(&m_clipMutex);
-
-	// We never use it with offset 0, but doesn't hurt to return a correct
-	// value if we do
-	if (offset == 0) { return INVAL(v); }
-
-	if (m_progressionType == ProgressionType::Discrete)
-	{
-		return OUTVAL(v);
-	}
-	else if( m_progressionType == ProgressionType::Linear )
-	{
-		auto const nv = std::next(v);
-		float slope =
-			(INVAL(nv) - OUTVAL(v))
-			/ (POS(nv) - POS(v));
-
-		return OUTVAL(v) + offset * slope;
-	}
-	else /* ProgressionType::CubicHermite */
-	{
-		// Implements a Cubic Hermite spline as explained at:
-		// http://en.wikipedia.org/wiki/Cubic_Hermite_spline#Unit_interval_.280.2C_1.29
-		//
-		// Note that we are not interpolating a 2 dimensional point over
-		// time as the article describes.  We are interpolating a single
-		// value: y.  To make this work we map the values of x that this
-		// segment spans to values of t for t = 0.0 -> 1.0 and scale the
-		// tangents _m1 and _m2
-		auto const nv = std::next(v);
-
-		int numValues = (POS(nv) - POS(v));
-		float t = (float) offset / (float) numValues;
-		float m1 = OUTTAN(v) * numValues * m_tension;
-		float m2 = INTAN(nv) * numValues * m_tension;
-
-		auto t2 = t * t, t3 = t2 * t;
-		return (2 * t3 - 3 * t2 + 1) * OUTVAL(v)
-			+ (t3 - 2 * t2 + t) * m1
-			+ (-2 * t3 + 3 * t2) * INVAL(nv)
-			+ (t3 - t2) * m2;
-	}
+	return valueAtUnlocked(v, offset);
 }
 
 
@@ -715,7 +869,7 @@ void AutomationClip::flipY(int min, int max)
 
 		if (changedTimeMap)
 		{
-			generateTangents();
+			generateTangentsUnlocked();
 		}
 	}
 
@@ -781,27 +935,27 @@ void AutomationClip::flipX(int start, int end)
 		}
 		else if (m_timeMap.contains(start))
 		{
-			tempMap[start] = AutomationNode(this, m_timeMap[start].getInValue(), valueAt(end), start);
-			tempMap[end] = AutomationNode(this, m_timeMap[start].getOutValue(), valueAt(end), end);
+			tempMap[start] = AutomationNode(this, m_timeMap[start].getInValue(), valueAtUnlocked(end), start);
+			tempMap[end] = AutomationNode(this, m_timeMap[start].getOutValue(), valueAtUnlocked(end), end);
 		}
 		else if (m_timeMap.contains(end))
 		{
-			tempMap[start] = AutomationNode(this, valueAt(start), m_timeMap[end].getInValue(), start);
-			tempMap[end] = AutomationNode(this, valueAt(start), m_timeMap[end].getOutValue(), end);
+			tempMap[start] = AutomationNode(this, valueAtUnlocked(start), m_timeMap[end].getInValue(), start);
+			tempMap[end] = AutomationNode(this, valueAtUnlocked(start), m_timeMap[end].getOutValue(), end);
 		}
 		else
 		{
-			tempMap[start] = AutomationNode(this, valueAt(start), valueAt(end), start);
-			tempMap[end] = AutomationNode(this, valueAt(start), valueAt(end), end);
+			tempMap[start] = AutomationNode(this, valueAtUnlocked(start), valueAtUnlocked(end), start);
+			tempMap[end] = AutomationNode(this, valueAtUnlocked(start), valueAtUnlocked(end), end);
 		}
 
 		m_timeMap.clear();
 
 		m_timeMap = tempMap;
 
-		cleanObjects();
+		cleanObjectsUnlocked();
 
-		generateTangents();
+		generateTangentsUnlocked();
 	}
 
 	// Emit signal outside critical section
@@ -930,7 +1084,7 @@ void AutomationClip::loadSettings( const QDomElement & _this )
 		changeLength( len );
 	}
 
-	if (shouldGenerateTangents) { generateTangents(); }
+	if (shouldGenerateTangents) { generateTangentsUnlocked(); }
 }
 
 
@@ -1158,18 +1312,7 @@ void AutomationClip::objectDestroyed( jo_id_t _id )
 void AutomationClip::cleanObjects()
 {
 	QWriteLocker m(&m_clipMutex);
-
-	for( objectVector::iterator it = m_objects.begin(); it != m_objects.end(); )
-	{
-		if( *it )
-		{
-			++it;
-		}
-		else
-		{
-			it = m_objects.erase( it );
-		}
-	}
+	cleanObjectsUnlocked();
 }
 
 
@@ -1177,7 +1320,8 @@ void AutomationClip::cleanObjects()
 
 void AutomationClip::generateTangents()
 {
-	generateTangents(m_timeMap.begin(), m_timeMap.size());
+	QWriteLocker m(&m_clipMutex);
+	generateTangentsUnlocked();
 }
 
 
@@ -1190,62 +1334,7 @@ void AutomationClip::generateTangents()
 void AutomationClip::generateTangents(timeMap::iterator it, int numToGenerate)
 {
 	QWriteLocker m(&m_clipMutex);
-
-	for (int i = 0; i < numToGenerate && it != m_timeMap.end(); ++i, ++it)
-	{
-		// Skip the node if it has locked tangents (were manually edited)
-		if (LOCKEDTAN(it))
-		{
-			continue;
-		}
-
-		auto const nit = std::next(it);
-
-		if (nit == m_timeMap.end())
-		{
-			// Previously, the last value's tangent was always set to 0. That logic was kept for both tangents
-			// of the last node
-			it.value().setInTangent(0);
-			it.value().setOutTangent(0);
-		}
-		else if (it == m_timeMap.begin())
-		{
-			// On the first node there's no curve behind it, so we will only calculate the outTangent
-			// and inTangent will be set to 0.
-			float tangent = (INVAL(nit) - OUTVAL(it)) / (POS(nit) - POS(it));
-			it.value().setInTangent(0);
-			it.value().setOutTangent(tangent);
-		}
-		else
-		{
-			// When we are in a node that is in the middle of two other nodes, we need to check if we
-			// have a discrete jump at this node. If we do not, then we can calculate the tangents normally.
-			// If we do have a discrete jump, then we have to calculate the tangents differently for each side
-			// of the curve.
-			// TODO: This behavior means that a very small difference between the inValue and outValue can
-			// result in a big change in the curve. In the future, allowing the user to manually adjust
-			// the tangents would be better.
-
-			auto const pit = std::prev(it);
-
-			if (OFFSET(it) == 0)
-			{
-				float inTangent = (INVAL(nit) - OUTVAL(pit)) / (POS(nit) - POS(pit));
-				it.value().setInTangent(inTangent);
-				// inTangent == outTangent in this case
-				it.value().setOutTangent(inTangent);
-			}
-			else
-			{
-				// Calculate the left side of the curve
-				float inTangent = (INVAL(it) - OUTVAL(pit)) / (POS(it) - POS(pit));
-				// Calculate the right side of the curve
-				float outTangent = (INVAL(nit) - OUTVAL(it)) / (POS(nit) - POS(it));
-				it.value().setInTangent(inTangent);
-				it.value().setOutTangent(outTangent);
-			}
-		}
-	}
+	generateTangentsUnlocked(it, numToGenerate);
 }
 
 std::vector<Track*> AutomationClip::combineAllTracks()
