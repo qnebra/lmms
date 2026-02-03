@@ -29,6 +29,7 @@
 
 #include <QMap>
 #include <QPointer>
+#include <QReadWriteLock>
 
 #include "AutomationNode.h"
 #include "Clip.h"
@@ -215,6 +216,17 @@ private:
 	void generateTangents(timeMap::iterator it, int numToGenerate);
 	float valueAt( timeMap::const_iterator v, int offset ) const;
 
+	// Unlocked helper methods - must be called with m_clipMutex already locked
+	void cleanObjectsUnlocked();
+	void generateTangentsUnlocked();
+	void generateTangentsUnlocked(timeMap::iterator it, int numToGenerate);
+	void removeNodeUnlocked(const TimePos & time);
+	void removeNodesUnlocked(const int tick0, const int tick1);
+	TimePos putValueUnlocked(const TimePos & time, const float value, const bool quantPos = true, const bool ignoreSurroundingPoints = true);
+	TimePos putValuesUnlocked(const TimePos & time, const float inValue, const float outValue, const bool quantPos = true, const bool ignoreSurroundingPoints = true);
+	float valueAtUnlocked( const TimePos & _time ) const;
+	float valueAtUnlocked( timeMap::const_iterator v, int offset ) const;
+
 	/**
 	 * @brief
 	 * This function combines the song tracks, pattern store tracks,
@@ -224,9 +236,10 @@ private:
 	 */
 	static std::vector<Track*> combineAllTracks();
 
-	// Mutex to make methods involving automation clips thread safe
+	// ReadWriteLock to make methods involving automation clips thread safe
+	// Provides better concurrent read performance compared to regular mutex
 	// Mutable so we can lock it from const objects
-	mutable QRecursiveMutex m_clipMutex;
+	mutable QReadWriteLock m_clipMutex;
 
 	AutomationTrack * m_autoTrack;
 	std::vector<jo_id_t> m_idsToResolve;
