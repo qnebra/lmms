@@ -58,7 +58,9 @@ signals:
 protected:
 	void paintEvent( QPaintEvent * _pe ) override;
 	void resizeEvent( QResizeEvent * _re ) override;
-	void contextMenuEvent( QContextMenuEvent * ) override = default;
+	void contextMenuEvent( QContextMenuEvent * ) override
+	{
+	}
 
 	QWidget * contentParent()
 	{
