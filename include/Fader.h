@@ -151,9 +151,10 @@ private:
 	QElapsedTimer m_lastPeakTimer_L;
 	QElapsedTimer m_lastPeakTimer_R;
 
-	QPixmap * m_back;
-	QPixmap * m_leds;
-	QPixmap * m_knob;
+private:
+	const QPixmap * m_back;
+	const QPixmap * m_leds;
+	const QPixmap * m_knob;
 
 	bool m_levelsDisplayedInDBFS;
 

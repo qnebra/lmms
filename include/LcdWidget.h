@@ -97,7 +97,7 @@ private:
 	QString m_display;
 
 	QString m_label;
-	QPixmap* m_lcdPixmap;
+	const QPixmap* m_lcdPixmap;
 
 	QColor m_textColor;
 	QColor m_textShadowColor;

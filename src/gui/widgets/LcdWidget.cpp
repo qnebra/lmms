@@ -44,7 +44,6 @@ LcdWidget::LcdWidget(QWidget* parent, const QString& name, bool leadingZero) :
 
 
 
-
 LcdWidget::LcdWidget(int numDigits, QWidget* parent, const QString& name, bool leadingZero) :
 	LcdWidget(numDigits, QString("19green"), parent, name, leadingZero)
 {
@@ -71,9 +70,8 @@ LcdWidget::LcdWidget(int numDigits, const QString& style, QWidget* parent, const
 
 LcdWidget::~LcdWidget()
 {
-	delete m_lcdPixmap;
+	// m_lcdPixmap points to static data, do not delete
 }
-
 
 
 
@@ -257,7 +255,7 @@ void LcdWidget::updateSize()
 	else
 	{
 		setFixedSize(
-			qMax<int>(
+			std::max(
 				m_cellWidth * m_numDigits + marginX1 + marginX2,
 				horizontalAdvance(QFontMetrics(pointSizeF(font(), 6.5)), m_label)
 			),

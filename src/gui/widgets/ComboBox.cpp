@@ -58,8 +58,7 @@ ComboBox::ComboBox( QWidget * _parent, const QString & _name ) :
 
 	setFont( pointSize<9>( font() ) );
 
-	connect( &m_menu, SIGNAL(triggered(QAction*)),
-				this, SLOT(setItem(QAction*)));
+	connect( &m_menu, &QMenu::triggered, this, &ComboBox::setItem );
 
 	setWindowTitle( _name );
 	doConnections();
