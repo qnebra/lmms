@@ -145,11 +145,6 @@ void ComboBox::mousePressEvent( QMouseEvent* event )
 		selectPrevious();
 		update();
 	}
-	else if( event->button() == Qt::RightButton )
-	{
-		selectPrevious();
-		update();
-	}
 	else
 	{
 		IntModelView::mousePressEvent( event );
