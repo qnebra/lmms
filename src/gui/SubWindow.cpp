@@ -46,7 +46,9 @@ SubWindow::SubWindow(QWidget *parent, Qt::WindowFlags windowFlags) :
 	QMdiSubWindow(parent, windowFlags),
 	m_buttonSize(17, 17),
 	m_titleBarHeight(titleBarHeight()),
-	m_hasFocus(false)
+	m_hasFocus(false),
+	m_childFilterInstalled(false),
+	m_lastTitleWidth(-1)
 {
 	// initialize the tracked geometry to whatever Qt thinks the normal geometry currently is.
 	// this should always work, since QMdiSubWindows will not start as maximized
@@ -87,6 +89,40 @@ SubWindow::SubWindow(QWidget *parent, Qt::WindowFlags windowFlags) :
 
 
 
+bool SubWindow::eventFilter( QObject * obj, QEvent * event )
+{
+	if( obj == widget() )
+	{
+		if( event->type() == QEvent::WindowIconChange )
+		{
+			updateCachedIcon();
+			update(); // Schedule a repaint
+			return false;
+		}
+		else if( event->type() == QEvent::WindowTitleChange || event->type() == QEvent::Resize )
+		{
+			adjustTitleBar();
+			return false;
+		}
+	}
+	return QMdiSubWindow::eventFilter( obj, event );
+}
+
+
+
+
+void SubWindow::updateCachedIcon()
+{
+	if( widget() )
+	{
+		m_cachedWinIcon = widget()->windowIcon().pixmap( m_buttonSize );
+		m_cachedWinIconSize = m_buttonSize;
+	}
+}
+
+
+
+
 /**
  * @brief SubWindow::paintEvent
  * 
@@ -117,8 +153,24 @@ void SubWindow::paintEvent( QPaintEvent * )
 	// window icon
 	if( widget() )
 	{
-		QPixmap winicon( widget()->windowIcon().pixmap( m_buttonSize ) );
-		p.drawPixmap( 3, 3, m_buttonSize.width(), m_buttonSize.height(), winicon );
+		// Install event filter on child widget if not already done
+		if( !m_childFilterInstalled )
+		{
+			widget()->installEventFilter( this );
+			m_childFilterInstalled = true;
+			updateCachedIcon();
+		}
+		
+		// Use cached pixmap to avoid repeated icon rasterization
+		if( m_cachedWinIcon.isNull() || m_cachedWinIconSize != m_buttonSize )
+		{
+			updateCachedIcon();
+		}
+		
+		if( !m_cachedWinIcon.isNull() )
+		{
+			p.drawPixmap( 3, 3, m_buttonSize.width(), m_buttonSize.height(), m_cachedWinIcon );
+		}
 	}
 }
 
@@ -346,21 +398,35 @@ void SubWindow::adjustTitleBar()
 	{
 		// title QLabel adjustments
 		m_windowTitle->setAlignment( Qt::AlignHCenter );
-		m_windowTitle->setFixedWidth( widget()->width() - ( menuButtonSpace + buttonBarWidth ) );
-		m_windowTitle->move( menuButtonSpace,
-			( m_titleBarHeight / 2 ) - ( m_windowTitle->sizeHint().height() / 2 ) - 1 );
-
+		
+		// Calculate the required width for the title
+		int titleWidth = widget()->width() - ( menuButtonSpace + buttonBarWidth );
+		
 		// if minimized we can't use widget()->width(). We have to hard code the width,
 		// as the width of all minimized windows is the same.
 		if( isMinimized() )
 		{
-			m_windowTitle->setFixedWidth( 120 );
+			titleWidth = 120;
 		}
-
-		// truncate the label string if the window is to small. Adds "..."
-		elideText( m_windowTitle, widget()->windowTitle() );
-		m_windowTitle->setTextInteractionFlags( Qt::NoTextInteraction );
-		m_windowTitle->adjustSize();
+		
+		// Get current window title
+		QString currentTitle = widget()->windowTitle();
+		
+		// Only update if title or width changed
+		if( currentTitle != m_lastWindowTitle || titleWidth != m_lastTitleWidth )
+		{
+			m_lastWindowTitle = currentTitle;
+			m_lastTitleWidth = titleWidth;
+			
+			m_windowTitle->setFixedWidth( titleWidth );
+			m_windowTitle->move( menuButtonSpace,
+				( m_titleBarHeight / 2 ) - ( m_windowTitle->sizeHint().height() / 2 ) - 1 );
+			
+			// truncate the label string if the window is to small. Adds "..."
+			elideText( m_windowTitle, currentTitle );
+			m_windowTitle->setTextInteractionFlags( Qt::NoTextInteraction );
+			m_windowTitle->adjustSize();
+		}
 	}
 }
 

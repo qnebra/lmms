@@ -34,7 +34,9 @@
 
 class QGraphicsDropShadowEffect;
 class QLabel;
+class QPixmap;
 class QPushButton;
+class QSize;
 class QWidget;
 
 namespace lmms::gui
@@ -79,6 +81,7 @@ protected:
 	void resizeEvent( QResizeEvent * event ) override;
 	void paintEvent( QPaintEvent * pe ) override;
 	void changeEvent( QEvent * event ) override;
+	bool eventFilter( QObject * obj, QEvent * event ) override;
 
 	QPushButton* addTitleButton(const std::string& iconName, const QString& toolTip);
 
@@ -99,9 +102,19 @@ private:
 	QLabel * m_windowTitle;
 	QGraphicsDropShadowEffect * m_shadow;
 	bool m_hasFocus;
+	
+	// Performance optimization: cache child widget icon
+	QPixmap m_cachedWinIcon;
+	QSize m_cachedWinIconSize;
+	bool m_childFilterInstalled;
+	
+	// Performance optimization: cache last title state to avoid redundant updates
+	QString m_lastWindowTitle;
+	int m_lastTitleWidth;
 
 	static void elideText( QLabel *label, QString text );
 	void adjustTitleBar();
+	void updateCachedIcon();
 
 private slots:
 	void focusChanged( QMdiSubWindow * subWindow );
