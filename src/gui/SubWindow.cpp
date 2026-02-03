@@ -115,7 +115,7 @@ void SubWindow::setWidget( QWidget * widget )
 
 bool SubWindow::eventFilter( QObject * obj, QEvent * event )
 {
-	if( obj == widget() )
+	if( obj == m_childWithFilter )
 	{
 		if( event->type() == QEvent::WindowIconChange )
 		{
@@ -140,7 +140,6 @@ void SubWindow::updateCachedIcon()
 	if( widget() )
 	{
 		m_cachedWinIcon = widget()->windowIcon().pixmap( m_buttonSize );
-		m_cachedWinIconSize = m_buttonSize;
 	}
 }
 
