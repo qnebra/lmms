@@ -29,6 +29,7 @@
 
 #include <QWidget>
 
+#include <array>
 #include <vector>
 
 #include "Editor.h"
@@ -459,6 +460,9 @@ private:
 	//! Calculates the closest note to the mouse given their parameter automation curve
 	Note* parameterEditNoteUnderMouse(Note::ParameterType paramType);
 
+	//! Rebuilds the per-MIDI-key index for fast note lookup
+	void rebuildNotesIndex();
+
 	// turn a selection rectangle into selected notes
 	void computeSelectedNotes( bool shift );
 	void clearSelectedNotes();
@@ -508,6 +512,9 @@ private:
 
 	StepRecorderWidget m_stepRecorderWidget;
 	StepRecorder m_stepRecorder;
+
+	//! Per-MIDI-key index for fast note lookup in noteUnderMouse
+	std::array<std::vector<Note*>, NumKeys> m_notesByKey;
 
 	// qproperty fields
 	QColor m_barLineColor;
