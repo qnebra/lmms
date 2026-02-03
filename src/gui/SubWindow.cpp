@@ -48,7 +48,7 @@ SubWindow::SubWindow(QWidget *parent, Qt::WindowFlags windowFlags) :
 	m_titleBarHeight(titleBarHeight()),
 	m_hasFocus(false),
 	m_childFilterInstalled(false),
-	m_lastTitleWidth(-1)
+	m_lastTitleWidth(0)
 {
 	// initialize the tracked geometry to whatever Qt thinks the normal geometry currently is.
 	// this should always work, since QMdiSubWindows will not start as maximized
@@ -84,6 +84,22 @@ SubWindow::SubWindow(QWidget *parent, Qt::WindowFlags windowFlags) :
 	setWindowFlags((this->windowFlags() & ~Qt::WindowMinimizeButtonHint) | Qt::CustomizeWindowHint);
 
 	connect(mdiArea(), &QMdiArea::subWindowActivated, this, &SubWindow::focusChanged);
+}
+
+
+
+
+void SubWindow::setWidget( QWidget * widget )
+{
+	QMdiSubWindow::setWidget( widget );
+	
+	// Install event filter on the new widget to listen for icon/title/resize changes
+	if( widget && !m_childFilterInstalled )
+	{
+		widget->installEventFilter( this );
+		m_childFilterInstalled = true;
+		updateCachedIcon();
+	}
 }
 
 
@@ -153,16 +169,8 @@ void SubWindow::paintEvent( QPaintEvent * )
 	// window icon
 	if( widget() )
 	{
-		// Install event filter on child widget if not already done
-		if( !m_childFilterInstalled )
-		{
-			widget()->installEventFilter( this );
-			m_childFilterInstalled = true;
-			updateCachedIcon();
-		}
-		
 		// Use cached pixmap to avoid repeated icon rasterization
-		if( m_cachedWinIcon.isNull() || m_cachedWinIconSize != m_buttonSize )
+		if( m_cachedWinIcon.isNull() )
 		{
 			updateCachedIcon();
 		}

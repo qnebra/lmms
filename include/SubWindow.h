@@ -74,6 +74,8 @@ public:
 	// TODO Needed to update the title bar when replacing instruments.
 	// Update works automatically if QMdiSubWindows are used.
 	void updateTitleBar();
+	
+	void setWidget( QWidget * widget ) override;
 
 protected:
 	// hook the QWidget move/resize events to update the tracked geometry
