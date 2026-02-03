@@ -44,6 +44,7 @@
 #include <QToolButton>
 
 #include <cmath>
+#include <algorithm>
 #include <utility>
 
 #include "AutomationEditor.h"
@@ -900,6 +901,7 @@ void PianoRoll::setCurrentMidiClip( MidiClip* newMidiClip )
 	connect( m_midiClip->instrumentTrack(), SIGNAL( midiNoteOn( const lmms::Note& ) ), this, SLOT( startRecordNote( const lmms::Note& ) ) );
 	connect( m_midiClip->instrumentTrack(), SIGNAL( midiNoteOff( const lmms::Note& ) ), this, SLOT( finishRecordNote( const lmms::Note& ) ) );
 	connect( m_midiClip, SIGNAL(dataChanged()), this, SLOT(update()));
+	connect( m_midiClip, &MidiClip::dataChanged, this, &PianoRoll::rebuildNotesIndex);
 	connect( m_midiClip->instrumentTrack()->pianoModel(), SIGNAL(dataChanged()), this, SLOT(update()));
 
 	connect(m_midiClip->instrumentTrack()->firstKeyModel(), SIGNAL(dataChanged()), this, SLOT(update()));
@@ -909,6 +911,7 @@ void PianoRoll::setCurrentMidiClip( MidiClip* newMidiClip )
 		this, SLOT(update()));
 	connect(m_midiClip, &MidiClip::lengthChanged, this, qOverload<>(&QWidget::update));
 
+	rebuildNotesIndex();
 	update();
 	emit currentMidiClipChanged();
 }
@@ -5050,6 +5053,44 @@ bool PianoRoll::mouseOverNote()
 
 
 
+
+
+void PianoRoll::rebuildNotesIndex()
+{
+	// Clear the index
+	for (auto& bucket : m_notesByKey)
+	{
+		bucket.clear();
+	}
+
+	// Return early if no valid clip
+	if (!hasValidMidiClip())
+	{
+		return;
+	}
+
+	// Populate the index by grouping notes by their MIDI key
+	for (Note* note : m_midiClip->notes())
+	{
+		int key = note->key();
+		// Ensure key is within valid range
+		if (key >= 0 && key < NumKeys)
+		{
+			m_notesByKey[key].push_back(note);
+		}
+	}
+
+	// Sort notes within each bucket by position for potential optimizations
+	for (auto& bucket : m_notesByKey)
+	{
+		std::sort(bucket.begin(), bucket.end(), 
+			[](const Note* a, const Note* b) {
+				return a->pos() < b->pos();
+			});
+	}
+}
+
+
 Note * PianoRoll::noteUnderMouse()
 {
 	QPoint pos = mapFromGlobal( QCursor::pos() );
@@ -5066,15 +5107,20 @@ Note * PianoRoll::noteUnderMouse()
 	int pos_ticks = (pos.x() - m_whiteKeyWidth) *
 			TimePos::ticksPerBar() / m_ppb + m_currentPosition;
 
-	// loop through whole note-vector...
-	for( Note* const& note : m_midiClip->notes() )
+	// Check if key is valid
+	if (key_num < 0 || key_num >= NumKeys || !hasValidMidiClip())
 	{
-		// and check whether the cursor is over an
-		// existing note
-		if( pos_ticks >= note->pos()
+		return nullptr;
+	}
+
+	// Use the index to only check notes with matching key
+	const auto& notesForKey = m_notesByKey[key_num];
+	for (Note* note : notesForKey)
+	{
+		// Check whether the cursor is over an existing note
+		if (pos_ticks >= note->pos()
 				&& pos_ticks <= note->endPos()
-				&& note->key() == key_num
-				&& note->length() > 0 )
+				&& note->length() > 0)
 		{
 			return note;
 		}
