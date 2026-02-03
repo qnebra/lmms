@@ -124,23 +124,19 @@ bool AutomationClip::addObject( AutomatableModel * _obj, bool _search_dup )
 void AutomationClip::setProgressionType(
 					ProgressionType _new_progression_type )
 {
+	// Check for valid type before taking lock
+	if ( _new_progression_type == ProgressionType::Discrete ||
+		_new_progression_type == ProgressionType::Linear ||
+		_new_progression_type == ProgressionType::CubicHermite )
 	{
-		QWriteLocker m(&m_clipMutex);
-
-		if ( _new_progression_type == ProgressionType::Discrete ||
-			_new_progression_type == ProgressionType::Linear ||
-			_new_progression_type == ProgressionType::CubicHermite )
 		{
+			QWriteLocker m(&m_clipMutex);
 			m_progressionType = _new_progression_type;
 		}
-		else
-		{
-			return; // Invalid type, don't emit signal
-		}
-	}
 
-	// Emit signal outside critical section
-	emit dataChanged();
+		// Emit signal outside critical section
+		emit dataChanged();
+	}
 }
 
 
@@ -928,6 +924,10 @@ void AutomationClip::flipX(int start, int end)
 			}
 		}
 
+		// Cache values before modifying the map
+		float startValue = valueAtUnlocked(start);
+		float endValue = valueAtUnlocked(end);
+
 		if (m_timeMap.contains(start) && m_timeMap.contains(end))
 		{
 			tempMap[start] = AutomationNode(this, m_timeMap[start].getInValue(), m_timeMap[end].getInValue(), start);
@@ -935,18 +935,18 @@ void AutomationClip::flipX(int start, int end)
 		}
 		else if (m_timeMap.contains(start))
 		{
-			tempMap[start] = AutomationNode(this, m_timeMap[start].getInValue(), valueAtUnlocked(end), start);
-			tempMap[end] = AutomationNode(this, m_timeMap[start].getOutValue(), valueAtUnlocked(end), end);
+			tempMap[start] = AutomationNode(this, m_timeMap[start].getInValue(), endValue, start);
+			tempMap[end] = AutomationNode(this, m_timeMap[start].getOutValue(), endValue, end);
 		}
 		else if (m_timeMap.contains(end))
 		{
-			tempMap[start] = AutomationNode(this, valueAtUnlocked(start), m_timeMap[end].getInValue(), start);
-			tempMap[end] = AutomationNode(this, valueAtUnlocked(start), m_timeMap[end].getOutValue(), end);
+			tempMap[start] = AutomationNode(this, startValue, m_timeMap[end].getInValue(), start);
+			tempMap[end] = AutomationNode(this, startValue, m_timeMap[end].getOutValue(), end);
 		}
 		else
 		{
-			tempMap[start] = AutomationNode(this, valueAtUnlocked(start), valueAtUnlocked(end), start);
-			tempMap[end] = AutomationNode(this, valueAtUnlocked(start), valueAtUnlocked(end), end);
+			tempMap[start] = AutomationNode(this, startValue, endValue, start);
+			tempMap[end] = AutomationNode(this, startValue, endValue, end);
 		}
 
 		m_timeMap.clear();
