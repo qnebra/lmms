@@ -5079,15 +5079,6 @@ void PianoRoll::rebuildNotesIndex()
 			m_notesByKey[key].push_back(note);
 		}
 	}
-
-	// Sort notes within each bucket by position for potential optimizations
-	for (auto& bucket : m_notesByKey)
-	{
-		std::sort(bucket.begin(), bucket.end(), 
-			[](const Note* a, const Note* b) {
-				return a->pos() < b->pos();
-			});
-	}
 }
 
 
@@ -5108,7 +5099,7 @@ Note * PianoRoll::noteUnderMouse()
 			TimePos::ticksPerBar() / m_ppb + m_currentPosition;
 
 	// Check if key is valid
-	if (key_num < 0 || key_num >= NumKeys || !hasValidMidiClip())
+	if (key_num < 0 || key_num >= NumKeys)
 	{
 		return nullptr;
 	}
