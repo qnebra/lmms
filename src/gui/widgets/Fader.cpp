@@ -46,6 +46,7 @@
 
 #include "Fader.h"
 
+#include <algorithm>
 #include <QInputDialog>
 #include <QMouseEvent>
 #include <QPainter>
@@ -283,7 +284,7 @@ void Fader::setPeak( float fPeak, float &targetPeak, float &persistentPeak, QEla
 
 	if( persistentPeak > 0 && lastPeakTimer.elapsed() > 1500 )
 	{
-		persistentPeak = qMax<float>( 0, persistentPeak-0.05 );
+		persistentPeak = std::max( 0.0f, persistentPeak-0.05f );
 		update();
 	}
 }
@@ -323,9 +324,9 @@ void Fader::updateTextFloat()
 
 inline int Fader::calculateDisplayPeak( float fPeak )
 {
-	int peak = (int)( m_back->height() - ( fPeak / ( m_fMaxPeak - m_fMinPeak ) ) * m_back->height() );
+	int peak = static_cast<int>( m_back->height() - ( fPeak / ( m_fMaxPeak - m_fMinPeak ) ) * m_back->height() );
 
-	return qMin( peak, m_back->height() );
+	return std::min( peak, m_back->height() );
 }
 
 
@@ -365,12 +366,12 @@ void Fader::paintDBFSLevels(QPaintEvent * ev, QPainter & painter)
 
 
 	// Draw left levels
-	float const leftSpan = ampToDbfs(qMax<float>(0.0001, m_fPeakValue_L)) - minDB;
+	float const leftSpan = ampToDbfs(std::max(0.0001f, m_fPeakValue_L)) - minDB;
 	int peak_L = height * leftSpan * fullSpanReciprocal;
 	QRect drawRectL( 0, height - peak_L, width, peak_L ); // Source and target are identical
 	painter.drawPixmap( drawRectL, *m_leds, drawRectL );
 
-	float const persistentLeftPeakDBFS = ampToDbfs(qMax<float>(0.0001, m_persistentPeak_L));
+	float const persistentLeftPeakDBFS = ampToDbfs(std::max(0.0001f, m_persistentPeak_L));
 	int persistentPeak_L = height * (1 - (persistentLeftPeakDBFS - minDB) * fullSpanReciprocal);
 	// the LED's have a  4px padding and we don't want the peaks
 	// to draw on the fader background
@@ -387,12 +388,12 @@ void Fader::paintDBFSLevels(QPaintEvent * ev, QPainter & painter)
 
 
 	// Draw right levels
-	float const rightSpan = ampToDbfs(qMax<float>(0.0001, m_fPeakValue_R)) - minDB;
+	float const rightSpan = ampToDbfs(std::max(0.0001f, m_fPeakValue_R)) - minDB;
 	int peak_R = height * rightSpan * fullSpanReciprocal;
 	QRect const drawRectR( center, height - peak_R, width, peak_R ); // Source and target are identical
 	painter.drawPixmap( drawRectR, *m_leds, drawRectR );
 
-	float const persistentRightPeakDBFS = ampToDbfs(qMax<float>(0.0001, m_persistentPeak_R));
+	float const persistentRightPeakDBFS = ampToDbfs(std::max(0.0001f, m_persistentPeak_R));
 	int persistentPeak_R = height * (1 - (persistentRightPeakDBFS - minDB) * fullSpanReciprocal);
 	// the LED's have a  4px padding and we don't want the peaks
 	// to draw on the fader background
@@ -418,7 +419,7 @@ void Fader::paintLinearLevels(QPaintEvent * ev, QPainter & painter)
 	int center = m_back->width() - width;
 
 	int peak_L = calculateDisplayPeak( m_fPeakValue_L - m_fMinPeak );
-	int persistentPeak_L = qMax<int>( 3, calculateDisplayPeak( m_persistentPeak_L - m_fMinPeak ) );
+	int persistentPeak_L = std::max( 3, calculateDisplayPeak( m_persistentPeak_L - m_fMinPeak ) );
 	painter.drawPixmap( QRect( 0, peak_L, width, height - peak_L ), *m_leds, QRect( 0, peak_L, width, height - peak_L ) );
 
 	if( m_persistentPeak_L > 0.05 )
@@ -429,7 +430,7 @@ void Fader::paintLinearLevels(QPaintEvent * ev, QPainter & painter)
 	}
 
 	int peak_R = calculateDisplayPeak( m_fPeakValue_R - m_fMinPeak );
-	int persistentPeak_R = qMax<int>( 3, calculateDisplayPeak( m_persistentPeak_R - m_fMinPeak ) );
+	int persistentPeak_R = std::max( 3, calculateDisplayPeak( m_persistentPeak_R - m_fMinPeak ) );
 	painter.drawPixmap( QRect( center, peak_R, width, height - peak_R ), *m_leds, QRect( center, peak_R, width, height - peak_R ) );
 
 	if( m_persistentPeak_R > 0.05 )

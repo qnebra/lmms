@@ -134,7 +134,7 @@ void ComboBox::mousePressEvent( QMouseEvent* event )
 			m_pressed = false;
 			update();
 		}
-		else if( event->button() == Qt::LeftButton )
+		else
 		{
 			selectNext();
 			update();

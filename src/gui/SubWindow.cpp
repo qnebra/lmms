@@ -168,7 +168,7 @@ void SubWindow::changeEvent( QEvent *event )
  * @param label - holds a pointer to the QLabel
  * @param text  - the text which will be stored (and if needed breaked down) into the QLabel.
  */
-void SubWindow::elideText( QLabel *label, QString text )
+void SubWindow::elideText( QLabel *label, const QString& text )
 {
 	QFontMetrics metrix( label->font() );
 	int width = label->width() - 2;

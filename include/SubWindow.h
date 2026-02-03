@@ -94,7 +94,7 @@ private:
 	QGraphicsDropShadowEffect * m_shadow;
 	bool m_hasFocus;
 
-	static void elideText( QLabel *label, QString text );
+	static void elideText( QLabel *label, const QString& text );
 	void adjustTitleBar();
 
 private slots:
