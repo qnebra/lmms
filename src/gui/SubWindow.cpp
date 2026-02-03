@@ -47,7 +47,7 @@ SubWindow::SubWindow(QWidget *parent, Qt::WindowFlags windowFlags) :
 	m_buttonSize(17, 17),
 	m_titleBarHeight(titleBarHeight()),
 	m_hasFocus(false),
-	m_childFilterInstalled(false),
+	m_childWithFilter(nullptr),
 	m_lastTitleWidth(0)
 {
 	// initialize the tracked geometry to whatever Qt thinks the normal geometry currently is.
@@ -91,13 +91,21 @@ SubWindow::SubWindow(QWidget *parent, Qt::WindowFlags windowFlags) :
 
 void SubWindow::setWidget( QWidget * widget )
 {
+	// Remove event filter from previous widget if it exists
+	if( m_childWithFilter && m_childWithFilter != widget )
+	{
+		m_childWithFilter->removeEventFilter( this );
+		m_childWithFilter = nullptr;
+		m_cachedWinIcon = QPixmap(); // Clear cached icon
+	}
+	
 	QMdiSubWindow::setWidget( widget );
 	
 	// Install event filter on the new widget to listen for icon/title/resize changes
-	if( widget && !m_childFilterInstalled )
+	if( widget && widget != m_childWithFilter )
 	{
 		widget->installEventFilter( this );
-		m_childFilterInstalled = true;
+		m_childWithFilter = widget;
 		updateCachedIcon();
 	}
 }

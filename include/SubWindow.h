@@ -28,15 +28,15 @@
 #define LMMS_GUI_SUBWINDOW_H
 
 #include <QMdiSubWindow>
+#include <QPixmap>
+#include <QSize>
 #include <QString>
 
 #include "lmms_export.h"
 
 class QGraphicsDropShadowEffect;
 class QLabel;
-class QPixmap;
 class QPushButton;
-class QSize;
 class QWidget;
 
 namespace lmms::gui
@@ -108,7 +108,7 @@ private:
 	// Performance optimization: cache child widget icon
 	QPixmap m_cachedWinIcon;
 	QSize m_cachedWinIconSize;
-	bool m_childFilterInstalled;
+	QWidget * m_childWithFilter;
 	
 	// Performance optimization: cache last title state to avoid redundant updates
 	QString m_lastWindowTitle;
