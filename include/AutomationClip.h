@@ -29,6 +29,7 @@
 
 #include <QMap>
 #include <QPointer>
+#include <QReadWriteLock>
 
 #include "AutomationNode.h"
 #include "Clip.h"
@@ -224,9 +225,10 @@ private:
 	 */
 	static std::vector<Track*> combineAllTracks();
 
-	// Mutex to make methods involving automation clips thread safe
+	// ReadWriteLock to make methods involving automation clips thread safe
+	// Provides better concurrent read performance compared to regular mutex
 	// Mutable so we can lock it from const objects
-	mutable QRecursiveMutex m_clipMutex;
+	mutable QReadWriteLock m_clipMutex;
 
 	AutomationTrack * m_autoTrack;
 	std::vector<jo_id_t> m_idsToResolve;

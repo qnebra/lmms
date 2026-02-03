@@ -26,6 +26,9 @@
 
 #include "AutomationClip.h"
 
+#include <QReadLocker>
+#include <QWriteLocker>
+
 #include "AutomationNode.h"
 #include "AutomationClipView.h"
 #include "AutomationTrack.h"
@@ -71,9 +74,9 @@ AutomationClip::AutomationClip( const AutomationClip & _clip_to_copy ) :
 	m_isRecording(_clip_to_copy.m_isRecording),
 	m_lastRecordedValue(0)
 {
-	// Locks the mutex of the copied AutomationClip to make sure it
+	// Locks the mutex of the copied AutomationClip with read lock to make sure it
 	// doesn't change while it's being copied
-	QMutexLocker m(&_clip_to_copy.m_clipMutex);
+	QReadLocker m(&_clip_to_copy.m_clipMutex);
 
 	for( timeMap::const_iterator it = _clip_to_copy.m_timeMap.begin();
 				it != _clip_to_copy.m_timeMap.end(); ++it )
@@ -87,26 +90,29 @@ AutomationClip::AutomationClip( const AutomationClip & _clip_to_copy ) :
 
 bool AutomationClip::addObject( AutomatableModel * _obj, bool _search_dup )
 {
-	QMutexLocker m(&m_clipMutex);
-
-	if (_search_dup && std::find(m_objects.begin(), m_objects.end(), _obj) != m_objects.end())
 	{
-		return false;
+		QWriteLocker m(&m_clipMutex);
+
+		if (_search_dup && std::find(m_objects.begin(), m_objects.end(), _obj) != m_objects.end())
+		{
+			return false;
+		}
+
+		// the automation track is unconnected and there is nothing in the track
+		if (m_objects.empty() && hasAutomation() == false)
+		{
+			// then initialize first value
+			putValue( TimePos(0), _obj->inverseScaledValue( _obj->value<float>() ), false );
+		}
+
+		m_objects.push_back(_obj);
+
+		connect( _obj, SIGNAL(destroyed(lmms::jo_id_t)),
+				this, SLOT(objectDestroyed(lmms::jo_id_t)),
+							Qt::DirectConnection );
 	}
 
-	// the automation track is unconnected and there is nothing in the track
-	if (m_objects.empty() && hasAutomation() == false)
-	{
-		// then initialize first value
-		putValue( TimePos(0), _obj->inverseScaledValue( _obj->value<float>() ), false );
-	}
-
-	m_objects.push_back(_obj);
-
-	connect( _obj, SIGNAL(destroyed(lmms::jo_id_t)),
-			this, SLOT(objectDestroyed(lmms::jo_id_t)),
-						Qt::DirectConnection );
-
+	// Emit signal outside critical section to reduce mutex holding time
 	emit dataChanged();
 
 	return true;
@@ -118,15 +124,23 @@ bool AutomationClip::addObject( AutomatableModel * _obj, bool _search_dup )
 void AutomationClip::setProgressionType(
 					ProgressionType _new_progression_type )
 {
-	QMutexLocker m(&m_clipMutex);
-
-	if ( _new_progression_type == ProgressionType::Discrete ||
-		_new_progression_type == ProgressionType::Linear ||
-		_new_progression_type == ProgressionType::CubicHermite )
 	{
-		m_progressionType = _new_progression_type;
-		emit dataChanged();
+		QWriteLocker m(&m_clipMutex);
+
+		if ( _new_progression_type == ProgressionType::Discrete ||
+			_new_progression_type == ProgressionType::Linear ||
+			_new_progression_type == ProgressionType::CubicHermite )
+		{
+			m_progressionType = _new_progression_type;
+		}
+		else
+		{
+			return; // Invalid type, don't emit signal
+		}
 	}
+
+	// Emit signal outside critical section
+	emit dataChanged();
 }
 
 
@@ -134,7 +148,7 @@ void AutomationClip::setProgressionType(
 
 void AutomationClip::setTension( QString _new_tension )
 {
-	QMutexLocker m(&m_clipMutex);
+	QWriteLocker m(&m_clipMutex);
 
 	bool ok;
 	float nt = LocaleHelper::toFloat(_new_tension, & ok);
@@ -150,7 +164,7 @@ void AutomationClip::setTension( QString _new_tension )
 
 const AutomatableModel * AutomationClip::firstObject() const
 {
-	QMutexLocker m(&m_clipMutex);
+	QReadLocker m(&m_clipMutex);
 
 	AutomatableModel* model;
 	if (!m_objects.empty() && (model = m_objects.front()) != nullptr)
@@ -164,7 +178,7 @@ const AutomatableModel * AutomationClip::firstObject() const
 
 const AutomationClip::objectVector& AutomationClip::objects() const
 {
-	QMutexLocker m(&m_clipMutex);
+	QReadLocker m(&m_clipMutex);
 
 	return m_objects;
 }
@@ -174,7 +188,7 @@ const AutomationClip::objectVector& AutomationClip::objects() const
 
 TimePos AutomationClip::timeMapLength() const
 {
-	QMutexLocker m(&m_clipMutex);
+	QReadLocker m(&m_clipMutex);
 
 	TimePos one_bar = TimePos(1, 0);
 	if (m_timeMap.isEmpty()) { return one_bar; }
@@ -223,36 +237,40 @@ TimePos AutomationClip::putValue(
 	const bool ignoreSurroundingPoints
 )
 {
-	QMutexLocker m(&m_clipMutex);
-
-	cleanObjects();
-
-	TimePos newTime = quantPos ? Note::quantized(time, quantization()) : time;
-	newTime = std::max(TimePos(0), newTime);
-
-	// Create a node or replace the existing one on newTime
-	m_timeMap[newTime] = AutomationNode(this, value, newTime);
-
-	timeMap::iterator it = m_timeMap.find(newTime);
-
-	// Remove control points that are covered by the new points
-	// quantization value. Control Key to override
-	if (!ignoreSurroundingPoints)
+	TimePos newTime;
 	{
-		// We need to check that to avoid removing nodes from
-		// newTime + 1 to newTime (removing the node we are adding)
-		if (quantization() > 1)
+		QWriteLocker m(&m_clipMutex);
+
+		cleanObjects();
+
+		newTime = quantPos ? Note::quantized(time, quantization()) : time;
+		newTime = std::max(TimePos(0), newTime);
+
+		// Create a node or replace the existing one on newTime
+		m_timeMap[newTime] = AutomationNode(this, value, newTime);
+
+		timeMap::iterator it = m_timeMap.find(newTime);
+
+		// Remove control points that are covered by the new points
+		// quantization value. Control Key to override
+		if (!ignoreSurroundingPoints)
 		{
-			// Remove nodes between the quantization points, them not
-			// being included
-			removeNodes(newTime + 1, newTime + quantization() - 1);
+			// We need to check that to avoid removing nodes from
+			// newTime + 1 to newTime (removing the node we are adding)
+			if (quantization() > 1)
+			{
+				// Remove nodes between the quantization points, them not
+				// being included
+				removeNodes(newTime + 1, newTime + quantization() - 1);
+			}
 		}
+		if (it != m_timeMap.begin()) { --it; }
+		generateTangents(it, 3);
+
+		updateLength();
 	}
-	if (it != m_timeMap.begin()) { --it; }
-	generateTangents(it, 3);
 
-	updateLength();
-
+	// Emit signal outside critical section
 	emit dataChanged();
 
 	return newTime;
@@ -279,36 +297,40 @@ TimePos AutomationClip::putValues(
 	const bool ignoreSurroundingPoints
 )
 {
-	QMutexLocker m(&m_clipMutex);
-
-	cleanObjects();
-
-	TimePos newTime = quantPos ? Note::quantized(time, quantization()) : time;
-	newTime = std::max(TimePos(0), newTime);
-
-	// Create a node or replace the existing one on newTime
-	m_timeMap[newTime] = AutomationNode(this, inValue, outValue, newTime);
-
-	timeMap::iterator it = m_timeMap.find(newTime);
-
-	// Remove control points that are covered by the new points
-	// quantization value. Control Key to override
-	if (!ignoreSurroundingPoints)
+	TimePos newTime;
 	{
-		// We need to check that to avoid removing nodes from
-		// newTime + 1 to newTime (removing the node we are adding)
-		if (quantization() > 1)
+		QWriteLocker m(&m_clipMutex);
+
+		cleanObjects();
+
+		newTime = quantPos ? Note::quantized(time, quantization()) : time;
+		newTime = std::max(TimePos(0), newTime);
+
+		// Create a node or replace the existing one on newTime
+		m_timeMap[newTime] = AutomationNode(this, inValue, outValue, newTime);
+
+		timeMap::iterator it = m_timeMap.find(newTime);
+
+		// Remove control points that are covered by the new points
+		// quantization value. Control Key to override
+		if (!ignoreSurroundingPoints)
 		{
-			// Remove nodes between the quantization points, them not
-			// being included
-			removeNodes(newTime + 1, newTime + quantization() - 1);
+			// We need to check that to avoid removing nodes from
+			// newTime + 1 to newTime (removing the node we are adding)
+			if (quantization() > 1)
+			{
+				// Remove nodes between the quantization points, them not
+				// being included
+				removeNodes(newTime + 1, newTime + quantization() - 1);
+			}
 		}
+		if (it != m_timeMap.begin()) { --it; }
+		generateTangents(it, 3);
+
+		updateLength();
 	}
-	if (it != m_timeMap.begin()) { --it; }
-	generateTangents(it, 3);
 
-	updateLength();
-
+	// Emit signal outside critical section
 	emit dataChanged();
 
 	return newTime;
@@ -319,20 +341,23 @@ TimePos AutomationClip::putValues(
 
 void AutomationClip::removeNode(const TimePos & time)
 {
-	QMutexLocker m(&m_clipMutex);
-
-	cleanObjects();
-
-	m_timeMap.remove( time );
-	timeMap::iterator it = m_timeMap.lowerBound(time);
-	if( it != m_timeMap.begin() )
 	{
-		--it;
+		QWriteLocker m(&m_clipMutex);
+
+		cleanObjects();
+
+		m_timeMap.remove( time );
+		timeMap::iterator it = m_timeMap.lowerBound(time);
+		if( it != m_timeMap.begin() )
+		{
+			--it;
+		}
+		generateTangents(it, 3);
+
+		updateLength();
 	}
-	generateTangents(it, 3);
 
-	updateLength();
-
+	// Emit signal outside critical section
 	emit dataChanged();
 }
 
@@ -428,7 +453,7 @@ void AutomationClip::resetTangents(const int tick0, const int tick1)
 
 void AutomationClip::recordValue(TimePos time, float value)
 {
-	QMutexLocker m(&m_clipMutex);
+	QWriteLocker m(&m_clipMutex);
 
 	if( value != m_lastRecordedValue )
 	{
@@ -461,7 +486,7 @@ TimePos AutomationClip::setDragValue(
 	const bool controlKey
 )
 {
-	QMutexLocker m(&m_clipMutex);
+	QWriteLocker m(&m_clipMutex);
 
 	if (m_dragging == false)
 	{
@@ -543,7 +568,7 @@ TimePos AutomationClip::setDragValue(
  */
 void AutomationClip::applyDragValue()
 {
-	QMutexLocker m(&m_clipMutex);
+	QWriteLocker m(&m_clipMutex);
 
 	m_dragging = false;
 }
@@ -553,7 +578,7 @@ void AutomationClip::applyDragValue()
 
 float AutomationClip::valueAt( const TimePos & _time ) const
 {
-	QMutexLocker m(&m_clipMutex);
+	QReadLocker m(&m_clipMutex);
 
 	if( m_timeMap.isEmpty() )
 	{
@@ -595,7 +620,7 @@ float AutomationClip::valueAt( const TimePos & _time ) const
 // that node and the inValue of the next node for the calculations.
 float AutomationClip::valueAt( timeMap::const_iterator v, int offset ) const
 {
-	QMutexLocker m(&m_clipMutex);
+	QReadLocker m(&m_clipMutex);
 
 	// We never use it with offset 0, but doesn't hurt to return a correct
 	// value if we do
@@ -644,7 +669,7 @@ float AutomationClip::valueAt( timeMap::const_iterator v, int offset ) const
 
 float *AutomationClip::valuesAfter( const TimePos & _time ) const
 {
-	QMutexLocker m(&m_clipMutex);
+	QReadLocker m(&m_clipMutex);
 
 	timeMap::const_iterator v = m_timeMap.lowerBound(_time);
 	auto const nv = std::next(v);
@@ -670,27 +695,33 @@ float *AutomationClip::valuesAfter( const TimePos & _time ) const
 
 void AutomationClip::flipY(int min, int max)
 {
-	QMutexLocker m(&m_clipMutex);
-
 	bool changedTimeMap = false;
-
-	for (auto it = m_timeMap.begin(); it != m_timeMap.end(); ++it)
 	{
-		// Get distance from IN/OUT values to max value
-		float inValDist = max - INVAL(it);
-		float outValDist = max - OUTVAL(it);
+		QWriteLocker m(&m_clipMutex);
 
-		// To flip, that will be the new distance between
-		// the IN/OUT values and the min value
-		it.value().setInValue(min + inValDist);
-		it.value().setOutValue(min + outValDist);
+		for (auto it = m_timeMap.begin(); it != m_timeMap.end(); ++it)
+		{
+			// Get distance from IN/OUT values to max value
+			float inValDist = max - INVAL(it);
+			float outValDist = max - OUTVAL(it);
 
-		changedTimeMap = true;
+			// To flip, that will be the new distance between
+			// the IN/OUT values and the min value
+			it.value().setInValue(min + inValDist);
+			it.value().setOutValue(min + outValDist);
+
+			changedTimeMap = true;
+		}
+
+		if (changedTimeMap)
+		{
+			generateTangents();
+		}
 	}
 
+	// Emit signal outside critical section
 	if (changedTimeMap)
 	{
-		generateTangents();
 		emit dataChanged();
 	}
 }
@@ -708,68 +739,72 @@ void AutomationClip::flipY()
 
 void AutomationClip::flipX(int start, int end)
 {
-	QMutexLocker m(&m_clipMutex);
-
-	timeMap::const_iterator firstIterator = m_timeMap.lowerBound(0);
-
-	if (firstIterator == m_timeMap.end()) { return; }
-
-	if (start == -1 && end == -1) { start = 0; end = length() - startTimeOffset(); }
-	else if (!(end >= 0 && start >= 0 && end > start)) { return; }
-
-	// Temporary map where we will store the flipped version
-	// of our clip
-	timeMap tempMap;
-
-	for (auto it = m_timeMap.begin(); it != m_timeMap.end(); ++it)
 	{
-		if (POS(it) < start || POS(it) > end)
+		QWriteLocker m(&m_clipMutex);
+
+		timeMap::const_iterator firstIterator = m_timeMap.lowerBound(0);
+
+		if (firstIterator == m_timeMap.end()) { return; }
+
+		if (start == -1 && end == -1) { start = 0; end = length() - startTimeOffset(); }
+		else if (!(end >= 0 && start >= 0 && end > start)) { return; }
+
+		// Temporary map where we will store the flipped version
+		// of our clip
+		timeMap tempMap;
+
+		for (auto it = m_timeMap.begin(); it != m_timeMap.end(); ++it)
 		{
-			tempMap[POS(it)] = *it;
-		}
-		else
-		{
-			// If the first node in the clip is not at the start, it can break things when clipping, so
-			// we have to set its in value to 0.
-			if (it == firstIterator && POS(firstIterator) > 0)
+			if (POS(it) < start || POS(it) > end)
 			{
-				tempMap[end - (POS(it) - start)] = AutomationNode(this, OUTVAL(it), 0, end - (POS(it) - start));
+				tempMap[POS(it)] = *it;
 			}
 			else
 			{
-				tempMap[end - (POS(it) - start)] = AutomationNode(this, OUTVAL(it), INVAL(it), end - (POS(it) - start));
+				// If the first node in the clip is not at the start, it can break things when clipping, so
+				// we have to set its in value to 0.
+				if (it == firstIterator && POS(firstIterator) > 0)
+				{
+					tempMap[end - (POS(it) - start)] = AutomationNode(this, OUTVAL(it), 0, end - (POS(it) - start));
+				}
+				else
+				{
+					tempMap[end - (POS(it) - start)] = AutomationNode(this, OUTVAL(it), INVAL(it), end - (POS(it) - start));
+				}
 			}
 		}
+
+		if (m_timeMap.contains(start) && m_timeMap.contains(end))
+		{
+			tempMap[start] = AutomationNode(this, m_timeMap[start].getInValue(), m_timeMap[end].getInValue(), start);
+			tempMap[end] = AutomationNode(this, m_timeMap[start].getOutValue(), m_timeMap[end].getOutValue(), end);
+		}
+		else if (m_timeMap.contains(start))
+		{
+			tempMap[start] = AutomationNode(this, m_timeMap[start].getInValue(), valueAt(end), start);
+			tempMap[end] = AutomationNode(this, m_timeMap[start].getOutValue(), valueAt(end), end);
+		}
+		else if (m_timeMap.contains(end))
+		{
+			tempMap[start] = AutomationNode(this, valueAt(start), m_timeMap[end].getInValue(), start);
+			tempMap[end] = AutomationNode(this, valueAt(start), m_timeMap[end].getOutValue(), end);
+		}
+		else
+		{
+			tempMap[start] = AutomationNode(this, valueAt(start), valueAt(end), start);
+			tempMap[end] = AutomationNode(this, valueAt(start), valueAt(end), end);
+		}
+
+		m_timeMap.clear();
+
+		m_timeMap = tempMap;
+
+		cleanObjects();
+
+		generateTangents();
 	}
 
-	if (m_timeMap.contains(start) && m_timeMap.contains(end))
-	{
-		tempMap[start] = AutomationNode(this, m_timeMap[start].getInValue(), m_timeMap[end].getInValue(), start);
-		tempMap[end] = AutomationNode(this, m_timeMap[start].getOutValue(), m_timeMap[end].getOutValue(), end);
-	}
-	else if (m_timeMap.contains(start))
-	{
-		tempMap[start] = AutomationNode(this, m_timeMap[start].getInValue(), valueAt(end), start);
-		tempMap[end] = AutomationNode(this, m_timeMap[start].getOutValue(), valueAt(end), end);
-	}
-	else if (m_timeMap.contains(end))
-	{
-		tempMap[start] = AutomationNode(this, valueAt(start), m_timeMap[end].getInValue(), start);
-		tempMap[end] = AutomationNode(this, valueAt(start), m_timeMap[end].getOutValue(), end);
-	}
-	else
-	{
-		tempMap[start] = AutomationNode(this, valueAt(start), valueAt(end), start);
-		tempMap[end] = AutomationNode(this, valueAt(start), valueAt(end), end);
-	}
-
-	m_timeMap.clear();
-
-	m_timeMap = tempMap;
-
-	cleanObjects();
-
-	generateTangents();
+	// Emit signal outside critical section
 	emit dataChanged();
 }
 
@@ -778,7 +813,7 @@ void AutomationClip::flipX(int start, int end)
 
 void AutomationClip::saveSettings( QDomDocument & _doc, QDomElement & _this )
 {
-	QMutexLocker m(&m_clipMutex);
+	QReadLocker m(&m_clipMutex);
 
 	_this.setAttribute( "pos", startPosition() );
 	_this.setAttribute( "len", length() );
@@ -823,7 +858,7 @@ void AutomationClip::saveSettings( QDomDocument & _doc, QDomElement & _this )
 
 void AutomationClip::loadSettings( const QDomElement & _this )
 {
-	QMutexLocker m(&m_clipMutex);
+	QWriteLocker m(&m_clipMutex);
 
 	// Legacy compatibility: Previously tangents were not stored in
 	// the project file. So if any node doesn't have tangent information
@@ -903,7 +938,7 @@ void AutomationClip::loadSettings( const QDomElement & _this )
 
 QString AutomationClip::name() const
 {
-	QMutexLocker m(&m_clipMutex);
+	QReadLocker m(&m_clipMutex);
 
 	if( !Clip::name().isEmpty() )
 	{
@@ -921,7 +956,7 @@ QString AutomationClip::name() const
 
 gui::ClipView * AutomationClip::createView( gui::TrackView * _tv )
 {
-	QMutexLocker m(&m_clipMutex);
+	QReadLocker m(&m_clipMutex);
 
 	return new gui::AutomationClipView( this, _tv );
 }
@@ -1077,10 +1112,13 @@ void AutomationClip::resolveAllIDs()
 
 void AutomationClip::clear()
 {
-	QMutexLocker m(&m_clipMutex);
+	{
+		QWriteLocker m(&m_clipMutex);
 
-	m_timeMap.clear();
+		m_timeMap.clear();
+	}
 
+	// Emit signal outside critical section
 	emit dataChanged();
 }
 
@@ -1089,25 +1127,28 @@ void AutomationClip::clear()
 
 void AutomationClip::objectDestroyed( jo_id_t _id )
 {
-	QMutexLocker m(&m_clipMutex);
-
-	// TODO: distict between temporary removal (e.g. LADSPA controls
-	// when switching samplerate) and real deletions because in the latter
-	// case we had to remove ourselves if we're the global automation
-	// clip of the destroyed object
-	m_idsToResolve.push_back(_id);
-
-	for (auto objIt = m_objects.begin(); objIt != m_objects.end(); objIt++)
 	{
-		Q_ASSERT( !(*objIt).isNull() );
-		if( (*objIt)->id() == _id )
+		QWriteLocker m(&m_clipMutex);
+
+		// TODO: distict between temporary removal (e.g. LADSPA controls
+		// when switching samplerate) and real deletions because in the latter
+		// case we had to remove ourselves if we're the global automation
+		// clip of the destroyed object
+		m_idsToResolve.push_back(_id);
+
+		for (auto objIt = m_objects.begin(); objIt != m_objects.end(); objIt++)
 		{
-			//Assign to objIt so that this loop work even break; is removed.
-			objIt = m_objects.erase( objIt );
-			break;
+			Q_ASSERT( !(*objIt).isNull() );
+			if( (*objIt)->id() == _id )
+			{
+				//Assign to objIt so that this loop work even break; is removed.
+				objIt = m_objects.erase( objIt );
+				break;
+			}
 		}
 	}
 
+	// Emit signal outside critical section
 	emit dataChanged();
 }
 
@@ -1116,7 +1157,7 @@ void AutomationClip::objectDestroyed( jo_id_t _id )
 
 void AutomationClip::cleanObjects()
 {
-	QMutexLocker m(&m_clipMutex);
+	QWriteLocker m(&m_clipMutex);
 
 	for( objectVector::iterator it = m_objects.begin(); it != m_objects.end(); )
 	{
@@ -1148,7 +1189,7 @@ void AutomationClip::generateTangents()
 // outTangent values of the node will be the same too.
 void AutomationClip::generateTangents(timeMap::iterator it, int numToGenerate)
 {
-	QMutexLocker m(&m_clipMutex);
+	QWriteLocker m(&m_clipMutex);
 
 	for (int i = 0; i < numToGenerate && it != m_timeMap.end(); ++i, ++it)
 	{
