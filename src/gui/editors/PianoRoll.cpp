@@ -145,10 +145,8 @@ static void initNoteStringCache()
 		{
 			for (int key = 0; key < NumKeys; ++key)
 			{
-				// Performance: Pre-allocate capacity for concatenation
-				QString& str = s_cachedNoteStrings[key];
-				str = s_noteStrings[key % 12];
-				str += QString::number(static_cast<int>(FirstOctave + key / KeysPerOctave));
+				s_cachedNoteStrings[key] = s_noteStrings[key % 12] + 
+					QString::number(static_cast<int>(FirstOctave + key / KeysPerOctave));
 			}
 			s_noteStringsCached.store(true, std::memory_order_release);
 		}
