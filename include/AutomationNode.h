@@ -71,12 +71,22 @@ public:
 	{
 		return m_inValue;
 	}
+	/**
+	 * @brief Sets the inValue of an automation node and regenerates tangents
+	 * @param value Value to be assigned
+	 * @note THREADING: Caller must hold AutomationClip::m_clipMutex
+	 */
 	void setInValue(float value);
 
 	inline const float getOutValue() const
 	{
 		return m_outValue;
 	}
+	/**
+	 * @brief Sets the outValue of an automation node and regenerates tangents
+	 * @param value Value to be assigned
+	 * @note THREADING: Caller must hold AutomationClip::m_clipMutex
+	 */
 	void setOutValue(float value);
 	void resetOutValue();
 

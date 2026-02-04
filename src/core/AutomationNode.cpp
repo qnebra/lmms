@@ -67,13 +67,17 @@ AutomationNode::AutomationNode(AutomationClip* clip, float inValue, float outVal
 /**
  * @brief Sets the inValue of an automation node
  * @param Float value to be assigned
+ * 
+ * THREADING: This method assumes the caller holds m_clipMutex.
+ * It modifies m_inValue and calls generateTangents_unlocked which
+ * requires the lock. All known callers (GUI operations via friend
+ * access and AutomationClip methods) acquire the lock before calling.
 */
 void AutomationNode::setInValue(float value)
 {
 	m_inValue = value;
 
 	// Recalculate the tangents from neighbor nodes
-	// NOTE: Caller must hold m_clipMutex
 	AutomationClip::timeMap & tm = m_clip->getTimeMap();
 
 	// Get an iterator pointing to this node
@@ -88,13 +92,17 @@ void AutomationNode::setInValue(float value)
 /**
  * @brief Sets the outValue of an automation node
  * @param Float value to be assigned
+ * 
+ * THREADING: This method assumes the caller holds m_clipMutex.
+ * It modifies m_outValue and calls generateTangents_unlocked which
+ * requires the lock. All known callers (GUI operations via friend
+ * access and AutomationClip methods) acquire the lock before calling.
 */
 void AutomationNode::setOutValue(float value)
 {
 	m_outValue = value;
 
 	// Recalculate the tangents from neighbor nodes
-	// NOTE: Caller must hold m_clipMutex
 	AutomationClip::timeMap & tm = m_clip->getTimeMap();
 
 	// Get an iterator pointing to this node
