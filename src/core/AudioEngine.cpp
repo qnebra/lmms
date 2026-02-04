@@ -407,8 +407,12 @@ const SampleFrame* AudioEngine::renderNextBuffer()
 		renderStageNoteSetup();     // STAGE 0: clear old play handles and buffers, setup new play handles
 	}
 
-	renderStageInstruments();   // STAGE 1: run and render all play handles (read-only)
-	renderStageEffects();       // STAGE 2: process effects of all instrument- and sampletracks (read-only)
+	renderStageInstruments();   // STAGE 1: run and render all play handles
+
+	{
+		const auto lock = std::lock_guard{m_changeMutex};
+		renderStageEffects();       // STAGE 2: process effects and remove finished play handles
+	}
 
 	{
 		const auto lock = std::lock_guard{m_changeMutex};
