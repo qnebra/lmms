@@ -249,7 +249,7 @@ TimePos AutomationClip::putValue(
 		}
 	}
 	if (it != m_timeMap.begin()) { --it; }
-	generateTangents(it, 3);
+	generateTangents_unlocked(it, 3);
 
 	updateLength();
 
@@ -305,7 +305,7 @@ TimePos AutomationClip::putValues(
 		}
 	}
 	if (it != m_timeMap.begin()) { --it; }
-	generateTangents(it, 3);
+	generateTangents_unlocked(it, 3);
 
 	updateLength();
 
@@ -329,7 +329,7 @@ void AutomationClip::removeNode(const TimePos & time)
 	{
 		--it;
 	}
-	generateTangents(it, 3);
+	generateTangents_unlocked(it, 3);
 
 	updateLength();
 
@@ -402,13 +402,15 @@ void AutomationClip::resetNodes(const int tick0, const int tick1)
 
 void AutomationClip::resetTangents(const int tick0, const int tick1)
 {
+	QMutexLocker m(&m_clipMutex);
+
 	if (tick0 == tick1)
 	{
 		auto it = m_timeMap.find(TimePos(tick0));
 		if (it != m_timeMap.end())
 		{
 			it.value().setLockedTangents(false);
-			generateTangents(it, 1);
+			generateTangents_unlocked(it, 1);
 		}
 		return;
 	}
@@ -419,7 +421,7 @@ void AutomationClip::resetTangents(const int tick0, const int tick1)
 	for (auto it = m_timeMap.lowerBound(start), endIt = m_timeMap.upperBound(end); it != endIt; ++it)
 	{
 		it.value().setLockedTangents(false);
-		generateTangents(it, 1);
+		generateTangents_unlocked(it, 1);
 	}
 }
 
@@ -506,7 +508,7 @@ TimePos AutomationClip::setDragValue(
 	//Restore to the state before it the point were being dragged
 	m_timeMap = m_oldTimeMap;
 
-	generateTangents();
+	generateTangents_unlocked();
 
 	TimePos returnedPos;
 
@@ -593,10 +595,11 @@ float AutomationClip::valueAt( const TimePos & _time ) const
 
 // This method will get the value at an offset from a node, so we use the outValue of
 // that node and the inValue of the next node for the calculations.
+// NOTE: This is a hot-path method called frequently in the audio thread.
+// The iterator is already validated by the calling valueAt(TimePos) method which holds the lock.
+// Reading m_progressionType and m_tension without lock is acceptable (stale reads are negligible).
 float AutomationClip::valueAt( timeMap::const_iterator v, int offset ) const
 {
-	QMutexLocker m(&m_clipMutex);
-
 	// We never use it with offset 0, but doesn't hurt to return a correct
 	// value if we do
 	if (offset == 0) { return INVAL(v); }
@@ -690,7 +693,7 @@ void AutomationClip::flipY(int min, int max)
 
 	if (changedTimeMap)
 	{
-		generateTangents();
+		generateTangents_unlocked();
 		emit dataChanged();
 	}
 }
@@ -769,7 +772,7 @@ void AutomationClip::flipX(int start, int end)
 
 	cleanObjects();
 
-	generateTangents();
+	generateTangents_unlocked();
 	emit dataChanged();
 }
 
@@ -895,7 +898,7 @@ void AutomationClip::loadSettings( const QDomElement & _this )
 		changeLength( len );
 	}
 
-	if (shouldGenerateTangents) { generateTangents(); }
+	if (shouldGenerateTangents) { generateTangents_unlocked(); }
 }
 
 
@@ -1136,7 +1139,8 @@ void AutomationClip::cleanObjects()
 
 void AutomationClip::generateTangents()
 {
-	generateTangents(m_timeMap.begin(), m_timeMap.size());
+	QMutexLocker m(&m_clipMutex);
+	generateTangents_unlocked();
 }
 
 
@@ -1149,7 +1153,24 @@ void AutomationClip::generateTangents()
 void AutomationClip::generateTangents(timeMap::iterator it, int numToGenerate)
 {
 	QMutexLocker m(&m_clipMutex);
+	generateTangents_unlocked(it, numToGenerate);
+}
 
+
+
+
+// Unlocked variant - caller must hold m_clipMutex
+void AutomationClip::generateTangents_unlocked()
+{
+	generateTangents_unlocked(m_timeMap.begin(), m_timeMap.size());
+}
+
+
+
+
+// Unlocked variant - caller must hold m_clipMutex
+void AutomationClip::generateTangents_unlocked(timeMap::iterator it, int numToGenerate)
+{
 	for (int i = 0; i < numToGenerate && it != m_timeMap.end(); ++i, ++it)
 	{
 		// Skip the node if it has locked tangents (were manually edited)

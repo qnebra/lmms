@@ -73,6 +73,7 @@ void AutomationNode::setInValue(float value)
 	m_inValue = value;
 
 	// Recalculate the tangents from neighbor nodes
+	// NOTE: Caller must hold m_clipMutex
 	AutomationClip::timeMap & tm = m_clip->getTimeMap();
 
 	// Get an iterator pointing to this node
@@ -81,7 +82,7 @@ void AutomationNode::setInValue(float value)
 	if (it != tm.begin()) { --it; }
 
 	// Generate tangents from the previously, current and next nodes
-	m_clip->generateTangents(it, 3);
+	m_clip->generateTangents_unlocked(it, 3);
 }
 
 /**
@@ -93,6 +94,7 @@ void AutomationNode::setOutValue(float value)
 	m_outValue = value;
 
 	// Recalculate the tangents from neighbor nodes
+	// NOTE: Caller must hold m_clipMutex
 	AutomationClip::timeMap & tm = m_clip->getTimeMap();
 
 	// Get an iterator pointing to this node
@@ -101,7 +103,7 @@ void AutomationNode::setOutValue(float value)
 	if (it != tm.begin()) { --it; }
 
 	// Generate tangents from the previously, current and next nodes
-	m_clip->generateTangents(it, 3);
+	m_clip->generateTangents_unlocked(it, 3);
 }
 
 /**
