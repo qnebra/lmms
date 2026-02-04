@@ -350,29 +350,31 @@ void AudioEngine::renderStageEffects()
 	AudioEngineWorkerThread::startAndWaitForJobs();
 
 	// removed all play handles which are done
-	const auto lock = std::lock_guard{m_changeMutex};
-	for( PlayHandleList::Iterator it = m_playHandles.begin();
-						it != m_playHandles.end(); )
 	{
-		if( ( *it )->affinityMatters() &&
-			( *it )->affinity() != QThread::currentThread() )
+		const auto handleRemovalLock = std::lock_guard{m_changeMutex};
+		for( PlayHandleList::Iterator it = m_playHandles.begin();
+							it != m_playHandles.end(); )
 		{
-			++it;
-			continue;
-		}
-		if( ( *it )->isFinished() )
-		{
-			(*it)->audioBusHandle()->removePlayHandle(*it);
-			if((*it)->type() == PlayHandle::Type::NotePlayHandle)
+			if( ( *it )->affinityMatters() &&
+				( *it )->affinity() != QThread::currentThread() )
 			{
-				NotePlayHandleManager::release((NotePlayHandle*)*it);
+				++it;
+				continue;
 			}
-			else delete *it;
-			it = m_playHandles.erase(it);
-		}
-		else
-		{
-			++it;
+			if( ( *it )->isFinished() )
+			{
+				(*it)->audioBusHandle()->removePlayHandle(*it);
+				if((*it)->type() == PlayHandle::Type::NotePlayHandle)
+				{
+					NotePlayHandleManager::release((NotePlayHandle*)*it);
+				}
+				else delete *it;
+				it = m_playHandles.erase(it);
+			}
+			else
+			{
+				++it;
+			}
 		}
 	}
 }
@@ -404,7 +406,7 @@ const SampleFrame* AudioEngine::renderNextBuffer()
 	s_renderingThread = true;
 
 	{
-		const auto lock = std::lock_guard{m_changeMutex};
+		const auto setupLock = std::lock_guard{m_changeMutex};
 		renderStageNoteSetup();     // STAGE 0: clear old play handles and buffers, setup new play handles
 	}
 
@@ -412,7 +414,7 @@ const SampleFrame* AudioEngine::renderNextBuffer()
 	renderStageEffects();       // STAGE 2: process effects and remove finished play handles
 
 	{
-		const auto lock = std::lock_guard{m_changeMutex};
+		const auto mixLock = std::lock_guard{m_changeMutex};
 		renderStageMix();           // STAGE 3: do master mix in mixer
 	}
 
