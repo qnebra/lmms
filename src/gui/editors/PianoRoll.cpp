@@ -43,7 +43,9 @@
 #include <QStyleOption>
 #include <QToolButton>
 
+#include <atomic>
 #include <cmath>
+#include <mutex>
 #include <utility>
 
 #include "AutomationEditor.h"
@@ -130,18 +132,24 @@ static std::array<QString, 12> s_noteStrings {
 
 // Performance optimization: cache all note strings
 static std::array<QString, NumKeys> s_cachedNoteStrings;
-static bool s_noteStringsCached = false;
+static std::atomic<bool> s_noteStringsCached{false};
 
 static void initNoteStringCache()
 {
-	if (!s_noteStringsCached)
+	// Thread-safe initialization using double-checked locking pattern
+	if (!s_noteStringsCached.load(std::memory_order_acquire))
 	{
-		for (int key = 0; key < NumKeys; ++key)
+		static std::mutex initMutex;
+		std::lock_guard<std::mutex> lock(initMutex);
+		if (!s_noteStringsCached.load(std::memory_order_relaxed))
 		{
-			s_cachedNoteStrings[key] = s_noteStrings[key % 12] + 
-				QString::number(static_cast<int>(FirstOctave + key / KeysPerOctave));
+			for (int key = 0; key < NumKeys; ++key)
+			{
+				s_cachedNoteStrings[key] = s_noteStrings[key % 12] + 
+					QString::number(static_cast<int>(FirstOctave + key / KeysPerOctave));
+			}
+			s_noteStringsCached.store(true, std::memory_order_release);
 		}
-		s_noteStringsCached = true;
 	}
 }
 
@@ -3412,12 +3420,12 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 		}
     
 		p.setPen(m_lineColor);
-		// Performance optimization: Pre-calculate coordinate increment
-		const int xStep = q * m_ppb / TimePos::ticksPerBar();
+		// Performance optimization: Calculate tick increment once
+		// Note: We still recalculate x from tick to avoid accumulated rounding errors
 		for (tick = m_currentPosition - m_currentPosition % q,
 			x = xCoordOfTick(tick);
 			x <= width();
-			tick += q, x += xStep)
+			tick += q, x = xCoordOfTick(tick))
 		{
 			p.drawLine(x, keyAreaTop(), x, noteEditBottom());
 		}
