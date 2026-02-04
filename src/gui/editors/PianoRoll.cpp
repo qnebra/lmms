@@ -145,8 +145,10 @@ static void initNoteStringCache()
 		{
 			for (int key = 0; key < NumKeys; ++key)
 			{
-				s_cachedNoteStrings[key] = s_noteStrings[key % 12] + 
-					QString::number(static_cast<int>(FirstOctave + key / KeysPerOctave));
+				// Performance: Pre-allocate capacity for concatenation
+				QString& str = s_cachedNoteStrings[key];
+				str = s_noteStrings[key % 12];
+				str += QString::number(static_cast<int>(FirstOctave + key / KeysPerOctave));
 			}
 			s_noteStringsCached.store(true, std::memory_order_release);
 		}
@@ -3700,7 +3702,7 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 	if( hasValidMidiClip() )
 	{
 		// Performance optimization: Reuse clipping region from above
-		// (already set at line 3667)
+		// (already set before note drawing to exclude keyboard area)
 
 		const int topKey = qBound(0, m_startKey + m_pianoKeysVisible - 1, NumKeys - 1);
 		const int bottomKey = topKey - m_pianoKeysVisible;
@@ -3951,12 +3953,16 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 	}
 
 	// Performance optimization: use cached colors with alpha
-	if (!m_colorsCacheValid)
+	// Invalidate cache if source colors have changed
+	if (!m_colorsCacheValid || m_lineColor != m_lineColorPrevious || 
+	    m_beatLineColor != m_beatLineColorPrevious)
 	{
 		m_editAreaColorCached = QColor(m_lineColor);
 		m_editAreaColorCached.setAlpha(64);
 		m_currentKeyColorCached = QColor(m_beatLineColor);
 		m_currentKeyColorCached.setAlpha(64);
+		m_lineColorPrevious = m_lineColor;
+		m_beatLineColorPrevious = m_beatLineColor;
 		m_colorsCacheValid = true;
 	}
 
