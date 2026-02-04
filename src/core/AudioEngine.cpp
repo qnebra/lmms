@@ -351,7 +351,7 @@ void AudioEngine::renderStageEffects()
 
 	// removed all play handles which are done
 	{
-		const auto handleRemovalLock = std::lock_guard{m_changeMutex};
+		const auto removalLock = std::lock_guard{m_changeMutex};
 		for( PlayHandleList::Iterator it = m_playHandles.begin();
 							it != m_playHandles.end(); )
 		{
