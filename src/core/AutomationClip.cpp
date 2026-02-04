@@ -595,8 +595,6 @@ float AutomationClip::valueAt( const TimePos & _time ) const
 // that node and the inValue of the next node for the calculations.
 float AutomationClip::valueAt( timeMap::const_iterator v, int offset ) const
 {
-	QMutexLocker m(&m_clipMutex);
-
 	// We never use it with offset 0, but doesn't hurt to return a correct
 	// value if we do
 	if (offset == 0) { return INVAL(v); }
@@ -642,6 +640,8 @@ float AutomationClip::valueAt( timeMap::const_iterator v, int offset ) const
 
 
 
+// Returns heap-allocated array of values. Caller must delete[] when done.
+// Returns nullptr if there are no values after the given time.
 float *AutomationClip::valuesAfter( const TimePos & _time ) const
 {
 	QMutexLocker m(&m_clipMutex);
@@ -964,37 +964,55 @@ bool AutomationClip::isAutomated( const AutomatableModel * _m )
 std::vector<AutomationClip *> AutomationClip::clipsForModel(const AutomatableModel* _m)
 {
 	std::vector<AutomationClip *> clips;
-	auto l = combineAllTracks();
 
-	// go through all tracks...
-	for (const auto track : l)
-	{
-		// we want only automation tracks...
-		if (track->type() == Track::Type::Automation || track->type() == Track::Type::HiddenAutomation )
+	auto processTrackList = [&clips, _m](const auto& trackList) {
+		for (const auto track : trackList)
 		{
-			// go through all the clips...
-			for (const auto& trackClip : track->getClips())
+			if (track->type() == Track::Type::Automation || track->type() == Track::Type::HiddenAutomation)
 			{
-				auto a = dynamic_cast<AutomationClip*>(trackClip);
-				// check that the clip has automation
-				if( a && a->hasAutomation() )
+				for (const auto& trackClip : track->getClips())
 				{
-					// now check is the clip is connected to the model we want by going through all the connections
-					// of the clip
-					bool has_object = false;
-					for (const auto& object : a->m_objects)
+					auto a = dynamic_cast<AutomationClip*>(trackClip);
+					if (a && a->hasAutomation())
 					{
-						if (object == _m)
+						for (const auto& object : a->m_objects)
 						{
-							has_object = true;
+							if (object == _m)
+							{
+								clips.push_back(a);
+								break;
+							}
 						}
 					}
-					// if the clips is connected to the model, add it to the list
-					if (has_object) { clips.push_back(a); }
+				}
+			}
+		}
+	};
+
+	processTrackList(Engine::getSong()->tracks());
+	processTrackList(Engine::patternStore()->tracks());
+
+	// Process global automation track separately
+	auto* globalTrack = Engine::getSong()->globalAutomationTrack();
+	if (globalTrack)
+	{
+		for (const auto& trackClip : globalTrack->getClips())
+		{
+			auto a = dynamic_cast<AutomationClip*>(trackClip);
+			if (a && a->hasAutomation())
+			{
+				for (const auto& object : a->m_objects)
+				{
+					if (object == _m)
+					{
+						clips.push_back(a);
+						break;
+					}
 				}
 			}
 		}
 	}
+
 	return clips;
 }
 
@@ -1118,17 +1136,11 @@ void AutomationClip::cleanObjects()
 {
 	QMutexLocker m(&m_clipMutex);
 
-	for( objectVector::iterator it = m_objects.begin(); it != m_objects.end(); )
-	{
-		if( *it )
-		{
-			++it;
-		}
-		else
-		{
-			it = m_objects.erase( it );
-		}
-	}
+	m_objects.erase(
+		std::remove_if(m_objects.begin(), m_objects.end(),
+			[](const auto& obj) { return !obj; }),
+		m_objects.end()
+	);
 }
 
 
