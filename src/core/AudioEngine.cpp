@@ -350,6 +350,7 @@ void AudioEngine::renderStageEffects()
 	AudioEngineWorkerThread::startAndWaitForJobs();
 
 	// removed all play handles which are done
+	const auto lock = std::lock_guard{m_changeMutex};
 	for( PlayHandleList::Iterator it = m_playHandles.begin();
 						it != m_playHandles.end(); )
 	{
@@ -408,11 +409,7 @@ const SampleFrame* AudioEngine::renderNextBuffer()
 	}
 
 	renderStageInstruments();   // STAGE 1: run and render all play handles
-
-	{
-		const auto lock = std::lock_guard{m_changeMutex};
-		renderStageEffects();       // STAGE 2: process effects and remove finished play handles
-	}
+	renderStageEffects();       // STAGE 2: process effects and remove finished play handles
 
 	{
 		const auto lock = std::lock_guard{m_changeMutex};
