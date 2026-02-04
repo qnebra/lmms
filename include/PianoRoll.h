@@ -547,6 +547,13 @@ private:
 	QBrush m_blackKeyActiveBackground;
 	QBrush m_blackKeyInactiveBackground;
 	QBrush m_blackKeyDisabledBackground;
+
+	// Performance optimization: cached colors with alpha
+	QColor m_editAreaColorCached;
+	QColor m_currentKeyColorCached;
+	QColor m_lineColorPrevious;
+	QColor m_beatLineColorPrevious;
+	bool m_colorsCacheValid = false;
 } ;
 
 
