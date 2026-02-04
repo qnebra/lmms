@@ -128,9 +128,27 @@ static std::array<QString, 12> s_noteStrings {
 	"G", "G\u266F / A\u266D", "A", "A\u266F / B\u266D", "B"
 };
 
+// Performance optimization: cache all note strings
+static std::array<QString, NumKeys> s_cachedNoteStrings;
+static bool s_noteStringsCached = false;
+
+static void initNoteStringCache()
+{
+	if (!s_noteStringsCached)
+	{
+		for (int key = 0; key < NumKeys; ++key)
+		{
+			s_cachedNoteStrings[key] = s_noteStrings[key % 12] + 
+				QString::number(static_cast<int>(FirstOctave + key / KeysPerOctave));
+		}
+		s_noteStringsCached = true;
+	}
+}
+
 static QString getNoteString(int key)
 {
-	return s_noteStrings[key % 12] + QString::number(static_cast<int>(FirstOctave + key / KeysPerOctave));
+	initNoteStringCache();
+	return s_cachedNoteStrings[key];
 }
 
 // used for drawing of piano
@@ -3394,10 +3412,12 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 		}
     
 		p.setPen(m_lineColor);
+		// Performance optimization: Pre-calculate coordinate increment
+		const int xStep = q * m_ppb / TimePos::ticksPerBar();
 		for (tick = m_currentPosition - m_currentPosition % q,
 			x = xCoordOfTick(tick);
 			x <= width();
-			tick += q, x = xCoordOfTick(tick))
+			tick += q, x += xStep)
 		{
 			p.drawLine(x, keyAreaTop(), x, noteEditBottom());
 		}
@@ -3671,11 +3691,8 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 	int y_base = keyAreaBottom() - 1;
 	if( hasValidMidiClip() )
 	{
-		p.setClipRect(
-			m_whiteKeyWidth,
-			PR_TOP_MARGIN,
-			width() - m_whiteKeyWidth,
-			height() - PR_TOP_MARGIN);
+		// Performance optimization: Reuse clipping region from above
+		// (already set at line 3667)
 
 		const int topKey = qBound(0, m_startKey + m_pianoKeysVisible - 1, NumKeys - 1);
 		const int bottomKey = topKey - m_pianoKeysVisible;
@@ -3693,6 +3710,13 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 		{
 			for( const Note *note : m_ghostNotes )
 			{
+				// Performance optimization: Early exit for off-screen notes
+				// Check key range first (cheap comparison)
+				if (note->key() <= bottomKey || note->key() > topKey)
+				{
+					continue;
+				}
+
 				int len_ticks = note->length();
 
 				if( len_ticks == 0 )
@@ -3709,29 +3733,30 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 				int note_width = len_ticks * m_ppb / TimePos::ticksPerBar();
 				const int x = ( pos_ticks - m_currentPosition ) *
 						m_ppb / TimePos::ticksPerBar();
-				// skip this note if not in visible area at all
+				// skip this note if not in visible area horizontally
 				if (!(x + note_width >= 0 && x <= width() - m_whiteKeyWidth))
 				{
 					continue;
 				}
 
-				// is the note in visible area?
-				if (note->key() > bottomKey && note->key() <= topKey)
-				{
-
-					// we've done and checked all, let's draw the note
-					drawNoteRect(
-						p, x + m_whiteKeyWidth, noteYPos(note->key()), note_width,
-						note, m_ghostNoteColor, m_ghostNoteTextColor, m_selectedNoteColor,
-						m_ghostNoteOpacity, m_ghostNoteBorders, drawNoteNames);
-				}
-
+				// we've done and checked all, let's draw the note
+				drawNoteRect(
+					p, x + m_whiteKeyWidth, noteYPos(note->key()), note_width,
+					note, m_ghostNoteColor, m_ghostNoteTextColor, m_selectedNoteColor,
+					m_ghostNoteOpacity, m_ghostNoteBorders, drawNoteNames);
 			}
 		}
 		// -- End ghost MIDI clip
 
 		for( const Note *note : m_midiClip->notes() )
 		{
+			// Performance optimization: Early exit for off-screen notes (vertically)
+			// Check key range first before expensive calculations
+			if (note->key() <= bottomKey || note->key() > topKey)
+			{
+				continue;
+			}
+
 			int len_ticks = note->length();
 
 			if( len_ticks == 0 )
@@ -3752,26 +3777,22 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 
 			const int x = ( pos_ticks - m_currentPosition ) *
 					m_ppb / TimePos::ticksPerBar();
-			// Skip this note if not in visible area at all
+			// Skip this note if not in visible area horizontally
 			// But still draw the note if the detuning curve extends past the end of it.
 			if (!(x + std::max(note_width, detuningLength) >= 0 && x <= width() - m_whiteKeyWidth))
 			{
 				continue;
 			}
 
-			// is the note in visible area?
-			if (note->key() > bottomKey && note->key() <= topKey)
-			{
-				// We've done and checked all, let's draw the note with
-				// the appropriate color
-				const auto fillColor = note->type() == Note::Type::Regular ? m_noteColor : m_stepNoteColor;
+			// We've done and checked all, let's draw the note with
+			// the appropriate color
+			const auto fillColor = note->type() == Note::Type::Regular ? m_noteColor : m_stepNoteColor;
 
-				drawNoteRect(
-					p, x + m_whiteKeyWidth, noteYPos(note->key()), note_width,
-					note, fillColor, m_noteTextColor, m_selectedNoteColor,
-					m_noteOpacity, m_noteBorders, drawNoteNames
-				);
-			}
+			drawNoteRect(
+				p, x + m_whiteKeyWidth, noteYPos(note->key()), note_width,
+				note, fillColor, m_noteTextColor, m_selectedNoteColor,
+				m_noteOpacity, m_noteBorders, drawNoteNames
+			);
 
 			// draw note editing stuff
 			int editHandleTop = 0;
@@ -3921,12 +3942,15 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 		m_leftRightScroll->setPageStep( l );
 	}
 
-	// set line colors
-	auto editAreaCol = QColor(m_lineColor);
-	auto currentKeyCol = QColor(m_beatLineColor);
-
-	editAreaCol.setAlpha( 64 );
-	currentKeyCol.setAlpha( 64 );
+	// Performance optimization: use cached colors with alpha
+	if (!m_colorsCacheValid)
+	{
+		m_editAreaColorCached = QColor(m_lineColor);
+		m_editAreaColorCached.setAlpha(64);
+		m_currentKeyColorCached = QColor(m_beatLineColor);
+		m_currentKeyColorCached.setAlpha(64);
+		m_colorsCacheValid = true;
+	}
 
 	// horizontal line for the key under the cursor
 	if(hasValidMidiClip() && getGUI()->pianoRoll()->hasFocus())
@@ -3937,13 +3961,13 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 			yCoordOfKey(key_num) + 3,
 			width() - 10,
 			m_keyLineHeight - 7,
-			currentKeyCol);
+			m_currentKeyColorCached);
 	}
 
 	// bar to resize note edit area
 	p.setClipRect( 0, 0, width(), height() );
 	p.fillRect( QRect( 0, keyAreaBottom(),
-					width()-PR_RIGHT_MARGIN, NOTE_EDIT_RESIZE_BAR ), editAreaCol );
+					width()-PR_RIGHT_MARGIN, NOTE_EDIT_RESIZE_BAR ), m_editAreaColorCached );
 
 	if (getGUI()->pianoRoll()->hasFocus())
 	{
