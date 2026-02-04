@@ -411,7 +411,7 @@ const SampleFrame* AudioEngine::renderNextBuffer()
 	}
 
 	renderStageInstruments();   // STAGE 1: run and render all play handles
-	renderStageEffects();       // STAGE 2: process effects and remove finished play handles
+	renderStageEffects();       // STAGE 2: process effects (includes removing finished play handles)
 
 	{
 		const auto mixLock = std::lock_guard{m_changeMutex};
