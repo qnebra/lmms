@@ -640,7 +640,7 @@ float AutomationClip::valueAt( timeMap::const_iterator v, int offset ) const
 
 
 
-// Returns heap-allocated array of values. CALLER MUST DELETE[] when done.
+// Returns heap-allocated array of values. Caller must delete[] when done.
 // Returns nullptr if there are no values after the given time.
 float *AutomationClip::valuesAfter( const TimePos & _time ) const
 {
@@ -964,8 +964,8 @@ bool AutomationClip::isAutomated( const AutomatableModel * _m )
 std::vector<AutomationClip *> AutomationClip::clipsForModel(const AutomatableModel* _m)
 {
 	std::vector<AutomationClip *> clips;
-	
-	auto processTrackList = [&](const auto& trackList) {
+
+	auto processTrackList = [&clips, _m](const auto& trackList) {
 		for (const auto track : trackList)
 		{
 			if (track->type() == Track::Type::Automation || track->type() == Track::Type::HiddenAutomation)
@@ -988,10 +988,10 @@ std::vector<AutomationClip *> AutomationClip::clipsForModel(const AutomatableMod
 			}
 		}
 	};
-	
+
 	processTrackList(Engine::getSong()->tracks());
 	processTrackList(Engine::patternStore()->tracks());
-	
+
 	// Process global automation track separately
 	auto* globalTrack = Engine::getSong()->globalAutomationTrack();
 	if (globalTrack)
@@ -1012,7 +1012,7 @@ std::vector<AutomationClip *> AutomationClip::clipsForModel(const AutomatableMod
 			}
 		}
 	}
-	
+
 	return clips;
 }
 
@@ -1138,7 +1138,7 @@ void AutomationClip::cleanObjects()
 
 	m_objects.erase(
 		std::remove_if(m_objects.begin(), m_objects.end(),
-		              [](const auto& obj) { return !obj; }),
+			[](const auto& obj) { return !obj; }),
 		m_objects.end()
 	);
 }
