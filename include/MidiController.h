@@ -73,6 +73,9 @@ public slots:
 	gui::ControllerDialog* createDialog( QWidget * _parent ) override;
 	void updateName();
 
+	void setInputChannel(int channel) { m_midiPort.setInputChannel(channel); }
+	void setInputController(int controller) { m_midiPort.setInputController(controller); }
+	MidiPort* midiPort() { return &m_midiPort; }
 
 protected:
 	// The internal per-controller get-value function
