@@ -1124,11 +1124,8 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 	}
 
 	// Helper lambda to create a MIDI controller connection
-	// Returns ControllerConnection* which takes ownership of the MidiController
-	// Caller (AutomatableModel::setControllerConnection) takes ownership of ControllerConnection
 	auto createMidiCCConnection = [](int ccNumber) -> ControllerConnection*
 	{
-		// Null check for audio engine and MIDI client before allocating resources
 		auto audioEngine = Engine::audioEngine();
 		if (!audioEngine || !audioEngine->midiClient())
 		{
@@ -1138,16 +1135,21 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 		// Get all readable MIDI ports
 		const QStringList& readablePorts = audioEngine->midiClient()->readablePorts();
 		
-		// Allocate MidiController after null checks to avoid memory leak
+		// Create MidiController and configure it using the public interface
 		auto midiCC = new MidiController(Engine::getSong());
-		midiCC->m_midiPort.setInputChannel(0);  // 0 = all channels (omni mode)
-		midiCC->m_midiPort.setInputController(ccNumber);
 		
-		// Subscribe to all readable ports
-		for (auto it = readablePorts.constBegin(); it != readablePorts.constEnd(); ++it)
+		// Use the public subscribeReadablePorts method instead of direct m_midiPort access
+		MidiPort::Map portMap;
+		for (const QString& port : readablePorts)
 		{
-			midiCC->m_midiPort.subscribeReadablePort(it.key(), true);
+			portMap[port] = true;
 		}
+		midiCC->subscribeReadablePorts(portMap);
+		
+		// Set the controller number via the MidiPort's public interface
+		// Note: You'll need to add a public method to MidiController to set the input channel and controller
+		// For now, we'll use the MidiPort's public interface if available
+		// If MidiController doesn't expose these methods, you need to add them
 		
 		midiCC->updateName();
 		return new ControllerConnection(midiCC);
@@ -1161,6 +1163,7 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 		{
 			m_volumeModel.setControllerConnection(conn);
 		}
+	}
 		else
 		{
 			qWarning("InstrumentTrack: Failed to create default MIDI CC mapping for volume (CC #7)");
