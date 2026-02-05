@@ -1117,6 +1117,12 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 		return;
 	}
 
+	// Don't create default mappings when loading existing projects
+	if (Engine::getSong() && Engine::getSong()->isLoadingProject())
+	{
+		return;
+	}
+
 	// Get all readable MIDI ports
 	const MidiPort::Map& readablePorts = Engine::audioEngine()->midiClient()->readablePorts();
 
