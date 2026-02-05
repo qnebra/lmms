@@ -1132,10 +1132,10 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 			return nullptr;
 		}
 
-		// Get all readable MIDI ports
+	// Get all readable MIDI ports
 		const QStringList& readablePorts = audioEngine->midiClient()->readablePorts();
 		
-		// Create MidiController and configure it using the public interface
+	// Create MidiController and configure it using the public interface
 		auto midiCC = new MidiController(Engine::getSong());
 			midiCC->setInputChannel(0);  // 0 = all channels (omni mode)
 			midiCC->setInputController(ccNumber);
@@ -1170,7 +1170,6 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 		{
 			qWarning("InstrumentTrack: Failed to create default MIDI CC mapping for volume (CC #7)");
 		}
-	}
 
 	// CC #10 → Panning
 	if (!m_panningModel.controllerConnection())
@@ -1186,6 +1185,5 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 		}
 	}
 }
-
 
 } // namespace lmms
