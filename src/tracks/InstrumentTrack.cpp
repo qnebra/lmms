@@ -1124,8 +1124,16 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 	}
 
 	// Helper lambda to create a MIDI controller connection
+	// Returns ControllerConnection* which takes ownership of the MidiController
+	// Caller (AutomatableModel::setControllerConnection) takes ownership of ControllerConnection
 	auto createMidiCCConnection = [](int ccNumber) -> ControllerConnection*
 	{
+		// Null check for audio engine and MIDI client
+		if (!Engine::audioEngine() || !Engine::audioEngine()->midiClient())
+		{
+			return nullptr;
+		}
+
 		// Get all readable MIDI ports
 		const MidiPort::Map& readablePorts = Engine::audioEngine()->midiClient()->readablePorts();
 		
@@ -1134,10 +1142,9 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 		midiCC->m_midiPort.setInputController(ccNumber);
 		
 		// Subscribe to all readable ports
-		for (MidiPort::Map::ConstIterator it = readablePorts.constBegin(); 
-			 it != readablePorts.constEnd(); ++it)
+		for (const auto& portPair : readablePorts)
 		{
-			midiCC->m_midiPort.subscribeReadablePort(it.key(), true);
+			midiCC->m_midiPort.subscribeReadablePort(portPair.first, true);
 		}
 		
 		midiCC->updateName();
@@ -1147,13 +1154,21 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 	// CC #7 → Volume
 	if (!m_volumeModel.controllerConnection())
 	{
-		m_volumeModel.setControllerConnection(createMidiCCConnection(MidiControllerMainVolume));
+		auto conn = createMidiCCConnection(MidiControllerMainVolume);
+		if (conn)
+		{
+			m_volumeModel.setControllerConnection(conn);
+		}
 	}
 
 	// CC #10 → Panning
 	if (!m_panningModel.controllerConnection())
 	{
-		m_panningModel.setControllerConnection(createMidiCCConnection(MidiControllerPan));
+		auto conn = createMidiCCConnection(MidiControllerPan);
+		if (conn)
+		{
+			m_panningModel.setControllerConnection(conn);
+		}
 	}
 }
 
