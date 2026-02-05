@@ -1137,14 +1137,16 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 		
 		// Create MidiController and configure it using the public interface
 		auto midiCC = new MidiController(Engine::getSong());
-		
-		// Use the public subscribeReadablePorts method instead of direct m_midiPort access
-		MidiPort::Map portMap;
-		for (const QString& port : readablePorts)
+			midiCC->setInputChannel(0);  // 0 = all channels (omni mode)
+			midiCC->setInputController(ccNumber);
+
+	// Subscribe to all readable ports
+			MidiPort::Map portMap;
+			for (const QString& port : readablePorts)
 		{
 			portMap[port] = true;
 		}
-		midiCC->subscribeReadablePorts(portMap);
+			midiCC->subscribeReadablePorts(portMap);
 		
 		// Set the controller number via the MidiPort's public interface
 		// Note: You'll need to add a public method to MidiController to set the input channel and controller
