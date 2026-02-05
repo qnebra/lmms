@@ -589,7 +589,8 @@ void MidiApple::NotifyCallback( const MIDINotification *message, void *refCon )
 			if (msg->childType == kMIDIObjectType_Destination) {
 				// Here your code to remove the destination ref
 				// and update your internal "clients"
-				qDebug("kMIDIMsgObjectRemoved destination '%s'",fullName);			}
+				qDebug("kMIDIMsgObjectRemoved destination '%s'",fullName);
+			}
 			midiApple->updateDeviceList();
 			break;
 		}
