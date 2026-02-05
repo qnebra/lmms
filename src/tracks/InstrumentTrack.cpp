@@ -35,6 +35,7 @@
 #include "Keymap.h"
 #include "MidiClient.h"
 #include "MidiClip.h"
+#include "MidiController.h"
 #include "MixHelpers.h"
 #include "PatternStore.h"
 #include "PatternTrack.h"
@@ -111,6 +112,7 @@ InstrumentTrack::InstrumentTrack(TrackContainer* tc) :
 	connect(&m_mixerChannelModel, SIGNAL(dataChanged()), this, SLOT(updateMixerChannel()), Qt::DirectConnection);
 
 	autoAssignMidiDevice(true);
+	createDefaultMidiCCMappings();
 }
 
 
@@ -1103,6 +1105,38 @@ void InstrumentTrack::autoAssignMidiDevice(bool assign)
 	{
 		m_midiPort.subscribeReadablePort(device, assign);
 		m_hasAutoMidiDev = assign;
+	}
+}
+
+
+void InstrumentTrack::createDefaultMidiCCMappings()
+{
+	// Only create if user preference is enabled
+	if (!ConfigManager::inst()->value("midi", "DefaultCCMappings", "1").toInt())
+	{
+		return;
+	}
+
+	// CC #7 → Volume
+	if (!m_volumeModel.controllerConnection())
+	{
+		auto volumeCC = new MidiController(Engine::getSong());
+		volumeCC->m_midiPort.setInputChannel(0);  // All channels
+		volumeCC->m_midiPort.setInputController(MidiControllerMainVolume);
+		volumeCC->updateName();
+		auto conn = new ControllerConnection(volumeCC);
+		m_volumeModel.setControllerConnection(conn);
+	}
+
+	// CC #10 → Panning
+	if (!m_panningModel.controllerConnection())
+	{
+		auto panCC = new MidiController(Engine::getSong());
+		panCC->m_midiPort.setInputChannel(0);  // All channels
+		panCC->m_midiPort.setInputController(MidiControllerPan);
+		panCC->updateName();
+		auto conn = new ControllerConnection(panCC);
+		m_panningModel.setControllerConnection(conn);
 	}
 }
 
