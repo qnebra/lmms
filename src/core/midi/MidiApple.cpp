@@ -571,6 +571,7 @@ void MidiApple::NotifyCallback( const MIDINotification *message, void *refCon )
 				// Here your code to save the new destination ref
 				// and update your internal "clients"
 			}
+			midiApple->updateDeviceList();
 			break;
 		}
 		case kMIDIMsgObjectRemoved:
@@ -589,6 +590,7 @@ void MidiApple::NotifyCallback( const MIDINotification *message, void *refCon )
 				// Here your code to remove the destination ref
 				// and update your internal "clients"
 				qDebug("kMIDIMsgObjectRemoved destination '%s'",fullName);			}
+			midiApple->updateDeviceList();
 			break;
 		}
 		case kMIDIMsgPropertyChanged:

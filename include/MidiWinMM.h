@@ -30,6 +30,7 @@
 #ifdef LMMS_BUILD_WIN32
 #include <windows.h>
 #include <mmsystem.h>
+#include <QTimer>
 
 #include "MidiClient.h"
 #include "MidiPort.h"
@@ -116,11 +117,12 @@ public:
 	}
 
 
-private:// slots:
-	void updateDeviceList();
+private slots:
+	void checkForDeviceChanges();
 
 
 private:
+	void updateDeviceList();
 	void openDevices();
 	void closeDevices();
 
@@ -137,6 +139,11 @@ private:
 	using SubMap = QMap<QString, MidiPortList>;
 	SubMap m_inputSubs;
 	SubMap m_outputSubs;
+
+	// hot-plug detection
+	QTimer m_deviceListUpdateTimer;
+	int m_lastInputDeviceCount;
+	int m_lastOutputDeviceCount;
 
 
 signals:
