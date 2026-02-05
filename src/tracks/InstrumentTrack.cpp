@@ -35,6 +35,7 @@
 #include "Keymap.h"
 #include "MidiClient.h"
 #include "MidiClip.h"
+#include "MidiController.h"
 #include "MixHelpers.h"
 #include "PatternStore.h"
 #include "PatternTrack.h"
@@ -111,6 +112,7 @@ InstrumentTrack::InstrumentTrack(TrackContainer* tc) :
 	connect(&m_mixerChannelModel, SIGNAL(dataChanged()), this, SLOT(updateMixerChannel()), Qt::DirectConnection);
 
 	autoAssignMidiDevice(true);
+	createDefaultMidiCCMappings();
 }
 
 
@@ -1103,6 +1105,55 @@ void InstrumentTrack::autoAssignMidiDevice(bool assign)
 	{
 		m_midiPort.subscribeReadablePort(device, assign);
 		m_hasAutoMidiDev = assign;
+	}
+}
+
+
+void InstrumentTrack::createDefaultMidiCCMappings()
+{
+	// Only create if user preference is enabled
+	if (!ConfigManager::inst()->value("midi", "DefaultCCMappings", "1").toInt())
+	{
+		return;
+	}
+
+	// Don't create default mappings when loading existing projects
+	if (Engine::getSong() && Engine::getSong()->isLoadingProject())
+	{
+		return;
+	}
+
+	// Helper lambda to create a MIDI controller connection
+	auto createMidiCCConnection = [](int ccNumber) -> ControllerConnection*
+	{
+		// Get all readable MIDI ports
+		const MidiPort::Map& readablePorts = Engine::audioEngine()->midiClient()->readablePorts();
+		
+		auto midiCC = new MidiController(Engine::getSong());
+		midiCC->m_midiPort.setInputChannel(0);  // 0 = all channels (omni mode)
+		midiCC->m_midiPort.setInputController(ccNumber);
+		
+		// Subscribe to all readable ports
+		for (MidiPort::Map::ConstIterator it = readablePorts.constBegin(); 
+			 it != readablePorts.constEnd(); ++it)
+		{
+			midiCC->m_midiPort.subscribeReadablePort(it.key(), true);
+		}
+		
+		midiCC->updateName();
+		return new ControllerConnection(midiCC);
+	};
+
+	// CC #7 → Volume
+	if (!m_volumeModel.controllerConnection())
+	{
+		m_volumeModel.setControllerConnection(createMidiCCConnection(MidiControllerMainVolume));
+	}
+
+	// CC #10 → Panning
+	if (!m_panningModel.controllerConnection())
+	{
+		m_panningModel.setControllerConnection(createMidiCCConnection(MidiControllerPan));
 	}
 }
 

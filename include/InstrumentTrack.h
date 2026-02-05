@@ -265,6 +265,7 @@ protected slots:
 
 private:
 	void processCCEvent(int controller);
+	void createDefaultMidiCCMappings();
 
 	MidiPort m_midiPort;
 
