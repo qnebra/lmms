@@ -1128,7 +1128,7 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 	// Caller (AutomatableModel::setControllerConnection) takes ownership of ControllerConnection
 	auto createMidiCCConnection = [](int ccNumber) -> ControllerConnection*
 	{
-		// Null check for audio engine and MIDI client
+		// Null check for audio engine and MIDI client before allocating resources
 		auto audioEngine = Engine::audioEngine();
 		if (!audioEngine || !audioEngine->midiClient())
 		{
@@ -1138,6 +1138,7 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 		// Get all readable MIDI ports
 		const MidiPort::Map& readablePorts = audioEngine->midiClient()->readablePorts();
 		
+		// Allocate MidiController after null checks to avoid memory leak
 		auto midiCC = new MidiController(Engine::getSong());
 		midiCC->m_midiPort.setInputChannel(0);  // 0 = all channels (omni mode)
 		midiCC->m_midiPort.setInputController(ccNumber);
@@ -1160,6 +1161,10 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 		{
 			m_volumeModel.setControllerConnection(conn);
 		}
+		else
+		{
+			qWarning("InstrumentTrack: Failed to create default MIDI CC mapping for volume (CC #7)");
+		}
 	}
 
 	// CC #10 → Panning
@@ -1169,6 +1174,10 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 		if (conn)
 		{
 			m_panningModel.setControllerConnection(conn);
+		}
+		else
+		{
+			qWarning("InstrumentTrack: Failed to create default MIDI CC mapping for panning (CC #10)");
 		}
 	}
 }
