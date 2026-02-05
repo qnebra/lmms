@@ -1124,32 +1124,25 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 	}
 
 	// Helper lambda to create a MIDI controller connection
-	auto createMidiCCConnection = [](int ccNumber) -> ControllerConnection*
+auto createMidiCCConnection = [](int ccNumber) -> ControllerConnection*
+{
+	auto midiCC = new MidiController(Engine::getSong());
+	
+	// Get all readable MIDI ports
+	const QStringList readablePorts = Engine::audioEngine()->midiClient()->readablePorts();
+	
+	// Subscribe to all readable ports
+	for (const QString& port : readablePorts)
 	{
-		// Get all readable MIDI ports
-		const QStringList readablePorts = Engine::audioEngine()->midiClient()->readablePorts();
-			for (const QString& port : readablePorts) 
-		{
-   			 midiCC->m_midiPort.subscribeReadablePort(port, true);
-		}
-		
-		auto midiCC = new MidiController(Engine::getSong());
-		midiCC->m_midiPort.setInputChannel(0);  // 0 = all channels (omni mode)
-		midiCC->m_midiPort.setInputController(ccNumber);
-			for (const QString& port : readablePorts) {
-  			midiCC->subscribeReadablePort(port, true);
-		}
-		
-		// Subscribe to all readable ports
-		for (MidiPort::Map::ConstIterator it = readablePorts.constBegin(); 
-			 it != readablePorts.constEnd(); ++it)
-		{
-			midiCC->m_midiPort.subscribeReadablePort(it.key(), true);
-		}
-		
-		midiCC->updateName();
-		return new ControllerConnection(midiCC);
-	};
+		midiCC->subscribeReadablePort(port, true);
+	}
+	
+	midiCC->setInputChannel(0);  // 0 = all channels (omni mode)
+	midiCC->setInputController(ccNumber);
+	midiCC->updateName();
+	
+	return new ControllerConnection(midiCC);
+};
 
 	// CC #7 → Volume
 	if (!m_volumeModel.controllerConnection())
