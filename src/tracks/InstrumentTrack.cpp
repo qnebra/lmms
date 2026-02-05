@@ -1129,13 +1129,14 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 	auto createMidiCCConnection = [](int ccNumber) -> ControllerConnection*
 	{
 		// Null check for audio engine and MIDI client
-		if (!Engine::audioEngine() || !Engine::audioEngine()->midiClient())
+		auto audioEngine = Engine::audioEngine();
+		if (!audioEngine || !audioEngine->midiClient())
 		{
 			return nullptr;
 		}
 
 		// Get all readable MIDI ports
-		const MidiPort::Map& readablePorts = Engine::audioEngine()->midiClient()->readablePorts();
+		const MidiPort::Map& readablePorts = audioEngine->midiClient()->readablePorts();
 		
 		auto midiCC = new MidiController(Engine::getSong());
 		midiCC->m_midiPort.setInputChannel(0);  // 0 = all channels (omni mode)
