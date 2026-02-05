@@ -1127,11 +1127,18 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 	auto createMidiCCConnection = [](int ccNumber) -> ControllerConnection*
 	{
 		// Get all readable MIDI ports
-		const MidiPort::Map& readablePorts = Engine::audioEngine()->midiClient()->readablePorts();
+		const QStringList readablePorts = Engine::audioEngine()->midiClient()->readablePorts();
+			for (const QString& port : readablePorts) 
+		{
+   			 midiCC->m_midiPort.subscribeReadablePort(port, true);
+		}
 		
 		auto midiCC = new MidiController(Engine::getSong());
 		midiCC->m_midiPort.setInputChannel(0);  // 0 = all channels (omni mode)
 		midiCC->m_midiPort.setInputController(ccNumber);
+			for (const QString& port : readablePorts) {
+  			midiCC->subscribeReadablePort(port, true);
+		}
 		
 		// Subscribe to all readable ports
 		for (MidiPort::Map::ConstIterator it = readablePorts.constBegin(); 

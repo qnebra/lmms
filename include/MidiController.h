@@ -73,6 +73,11 @@ public slots:
 	gui::ControllerDialog* createDialog( QWidget * _parent ) override;
 	void updateName();
 
+public:
+    void setInputChannel(int channel) { m_midiPort.setInputChannel(channel); }
+    void setInputController(int ccNumber) { m_midiPort.setInputController(ccNumber); }
+    void subscribeReadablePort(const QString& port, bool b) { m_midiPort.subscribeReadablePort(port, b); }
+
 
 protected:
 	// The internal per-controller get-value function
