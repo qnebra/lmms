@@ -1136,7 +1136,7 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 		}
 
 		// Get all readable MIDI ports
-		const MidiPort::Map& readablePorts = audioEngine->midiClient()->readablePorts();
+		const QStringList& readablePorts = audioEngine->midiClient()->readablePorts();
 		
 		// Allocate MidiController after null checks to avoid memory leak
 		auto midiCC = new MidiController(Engine::getSong());
