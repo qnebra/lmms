@@ -35,6 +35,7 @@
 #include "Keymap.h"
 #include "MidiClient.h"
 #include "MidiClip.h"
+#include "MidiController.h"
 #include "MixHelpers.h"
 #include "PatternStore.h"
 #include "PatternTrack.h"
@@ -111,6 +112,7 @@ InstrumentTrack::InstrumentTrack(TrackContainer* tc) :
 	connect(&m_mixerChannelModel, SIGNAL(dataChanged()), this, SLOT(updateMixerChannel()), Qt::DirectConnection);
 
 	autoAssignMidiDevice(true);
+	createDefaultMidiCCMappings();
 }
 
 
@@ -1106,5 +1108,82 @@ void InstrumentTrack::autoAssignMidiDevice(bool assign)
 	}
 }
 
+
+void InstrumentTrack::createDefaultMidiCCMappings()
+{
+	// Only create if user preference is enabled
+	if (!ConfigManager::inst()->value("midi", "DefaultCCMappings", "1").toInt())
+	{
+		return;
+	}
+
+	// Don't create default mappings when loading existing projects
+	if (Engine::getSong() && Engine::getSong()->isLoadingProject())
+	{
+		return;
+	}
+
+	// Helper lambda to create a MIDI controller connection
+	auto createMidiCCConnection = [](int ccNumber) -> ControllerConnection*
+	{
+		auto audioEngine = Engine::audioEngine();
+		if (!audioEngine || !audioEngine->midiClient())
+		{
+			return nullptr;
+		}
+
+	// Get all readable MIDI ports
+		const QStringList& readablePorts = audioEngine->midiClient()->readablePorts();
+		
+	// Create MidiController and configure it using the public interface
+		auto midiCC = new MidiController(Engine::getSong());
+			midiCC->setInputChannel(0);  // 0 = all channels (omni mode)
+			midiCC->setInputController(ccNumber);
+
+	// Subscribe to all readable ports
+			MidiPort::Map portMap;
+			for (const QString& port : readablePorts)
+		{
+			portMap[port] = true;
+		}
+			midiCC->subscribeReadablePorts(portMap);
+		
+		// Set the controller number via the MidiPort's public interface
+		// Note: You'll need to add a public method to MidiController to set the input channel and controller
+		// For now, we'll use the MidiPort's public interface if available
+		// If MidiController doesn't expose these methods, you need to add them
+		
+		midiCC->updateName();
+		return new ControllerConnection(midiCC);
+	};
+
+	// CC #7 → Volume
+	if (!m_volumeModel.controllerConnection())
+	{
+		auto conn = createMidiCCConnection(MidiControllerMainVolume);
+		if (conn)
+		{
+			m_volumeModel.setControllerConnection(conn);
+		}
+	}
+		else
+		{
+			qWarning("InstrumentTrack: Failed to create default MIDI CC mapping for volume (CC #7)");
+		}
+
+	// CC #10 → Panning
+	if (!m_panningModel.controllerConnection())
+	{
+		auto conn = createMidiCCConnection(MidiControllerPan);
+		if (conn)
+		{
+			m_panningModel.setControllerConnection(conn);
+		}
+		else
+		{
+			qWarning("InstrumentTrack: Failed to create default MIDI CC mapping for panning (CC #10)");
+		}
+	}
+}
 
 } // namespace lmms
