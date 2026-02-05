@@ -1142,9 +1142,9 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 		midiCC->m_midiPort.setInputController(ccNumber);
 		
 		// Subscribe to all readable ports
-		for (const auto& portPair : readablePorts)
+		for (auto it = readablePorts.constBegin(); it != readablePorts.constEnd(); ++it)
 		{
-			midiCC->m_midiPort.subscribeReadablePort(portPair.first, true);
+			midiCC->m_midiPort.subscribeReadablePort(it.key(), true);
 		}
 		
 		midiCC->updateName();
