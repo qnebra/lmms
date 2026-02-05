@@ -1117,12 +1117,23 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 		return;
 	}
 
+	// Get all readable MIDI ports
+	const MidiPort::Map& readablePorts = Engine::audioEngine()->midiClient()->readablePorts();
+
 	// CC #7 → Volume
 	if (!m_volumeModel.controllerConnection())
 	{
 		auto volumeCC = new MidiController(Engine::getSong());
 		volumeCC->m_midiPort.setInputChannel(0);  // All channels
 		volumeCC->m_midiPort.setInputController(MidiControllerMainVolume);
+		
+		// Subscribe to all readable ports
+		for (MidiPort::Map::ConstIterator it = readablePorts.constBegin(); 
+			 it != readablePorts.constEnd(); ++it)
+		{
+			volumeCC->m_midiPort.subscribeReadablePort(it.key(), true);
+		}
+		
 		volumeCC->updateName();
 		auto conn = new ControllerConnection(volumeCC);
 		m_volumeModel.setControllerConnection(conn);
@@ -1134,6 +1145,14 @@ void InstrumentTrack::createDefaultMidiCCMappings()
 		auto panCC = new MidiController(Engine::getSong());
 		panCC->m_midiPort.setInputChannel(0);  // All channels
 		panCC->m_midiPort.setInputController(MidiControllerPan);
+		
+		// Subscribe to all readable ports
+		for (MidiPort::Map::ConstIterator it = readablePorts.constBegin(); 
+			 it != readablePorts.constEnd(); ++it)
+		{
+			panCC->m_midiPort.subscribeReadablePort(it.key(), true);
+		}
+		
 		panCC->updateName();
 		auto conn = new ControllerConnection(panCC);
 		m_panningModel.setControllerConnection(conn);
