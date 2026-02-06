@@ -3571,6 +3571,7 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 		int leftBars = m_currentPosition / actualTicksPerBar;
 		
 		const qreal pixelsPerTick = static_cast<qreal>(m_ppb) / TimePos::ticksPerBar();
+		// Ensure at least 1 pixel per bar to prevent infinite loops in drawing logic
 		const int pixelsPerBar = std::max(1, qRound(pixelsPerTick * actualTicksPerBar));
 
 		const tick_t offsetTicksInBar = m_currentPosition % actualTicksPerBar;
