@@ -142,6 +142,10 @@ public:
 		m_commMutex.unlock();
 	}
 
+	// Hook for lazy initialization - subclasses can override to defer
+	// expensive initialization until first use
+	virtual void ensureInitialized() {}
+
 public slots:
 	virtual void showUI();
 	virtual void hideUI();

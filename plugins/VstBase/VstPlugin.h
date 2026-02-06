@@ -51,6 +51,9 @@ public:
 
 	bool processMessage( const message & _m ) override;
 
+	// Lazy initialization support
+	void ensureInitialized() override;
+
 	inline bool hasEditor() const
 	{
 		return m_pluginWindowID != 0;
@@ -148,6 +151,13 @@ private:
 
 	void toggleEditorVisibility(int visible = -1);
 
+	// Helper for detecting plugin type (Win32/Win64/Linux64)
+	enum class ExecutableType
+	{
+		Unknown, Win32, Win64, Linux64,
+	};
+	ExecutableType detectPluginType(const QString& pluginPath);
+
 	QString m_plugin;
 	QPointer<QWidget> m_pluginWidget;
 	int m_pluginWindowID;
@@ -170,6 +180,9 @@ private:
 	int m_currentProgram;
 
 	QTimer m_idleTimer;
+
+	// Lazy initialization support
+	bool m_lazyInitialized;
 
 } ;
 

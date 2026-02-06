@@ -116,11 +116,6 @@ private:
 namespace lmms
 {
 
-enum class ExecutableType
-{
-	Unknown, Win32, Win64, Linux64,
-};
-
 VstPlugin::VstPlugin( const QString & _plugin ) :
 	m_plugin( PathUtil::toAbsolute(_plugin) ),
 	m_pluginWindowID( 0 ),
@@ -128,39 +123,42 @@ VstPlugin::VstPlugin( const QString & _plugin ) :
 			? ConfigManager::inst()->vstEmbedMethod()
 			: "headless" ),
 	m_version( 0 ),
-	m_currentProgram()
+	m_currentProgram(),
+	m_lazyInitialized( false )
 {
 	setSplittedChannels( true );
 
-	auto pluginType = ExecutableType::Unknown;
-#ifdef LMMS_BUILD_LINUX
-	QFileInfo fi(m_plugin);
-	if (fi.suffix() == "so")
+	// Defer plugin loading and process spawning to ensureInitialized()
+	// This allows fast construction and lazy loading on first use
+
+	// Note: Signal connections and timer setup moved to ensureInitialized()
+}
+
+
+
+
+VstPlugin::~VstPlugin()
+{
+	delete m_pluginWidget;
+}
+
+
+
+
+void VstPlugin::ensureInitialized()
+{
+	// Check if already initialized
+	if (m_lazyInitialized)
 	{
-		pluginType = ExecutableType::Linux64;
+		return;
 	}
-	else
-#endif
-	{
-		try {
-			PE::FileInfo peInfo(m_plugin);
-			switch (peInfo.machineType())
-			{
-			case PE::MachineType::amd64:
-				pluginType = ExecutableType::Win64;
-				break;
-			case PE::MachineType::i386:
-				pluginType = ExecutableType::Win32;
-				break;
-			default:
-				qWarning() << "Unknown PE machine type"
-					<< QString::number(static_cast<uint16_t>(peInfo.machineType()), 16);
-				break;
-			}
-		} catch (std::runtime_error& e) {
-			qCritical() << "Error while determining PE file's machine type: " << e.what();
-		}
-	}
+
+	m_lazyInitialized = true;
+
+	qDebug() << "VstPlugin: Lazy initialization for" << m_plugin;
+
+	// Detect plugin type and load appropriate RemoteVstPlugin executable
+	auto pluginType = detectPluginType(m_plugin);
 
 	switch(pluginType)
 	{
@@ -172,7 +170,7 @@ VstPlugin::VstPlugin( const QString & _plugin ) :
 		break;
 #ifdef LMMS_BUILD_LINUX
 	case ExecutableType::Linux64:
-		tryLoad( NATIVE_LINUX_REMOTE_VST_PLUGIN_FILEPATH_64 ); // Default: NativeLinuxRemoteVstPlugin32
+		tryLoad( NATIVE_LINUX_REMOTE_VST_PLUGIN_FILEPATH_64 ); // Default: NativeLinuxRemoteVstPlugin64
 		break;
 #endif
 	default:
@@ -180,6 +178,7 @@ VstPlugin::VstPlugin( const QString & _plugin ) :
 		return;
 	}
 
+	// Setup signal connections and timer
 	setTempo( Engine::getSong()->getTempo() );
 
 	connect( Engine::getSong(), SIGNAL( tempoChanged( lmms::bpm_t ) ),
@@ -196,9 +195,38 @@ VstPlugin::VstPlugin( const QString & _plugin ) :
 
 
 
-VstPlugin::~VstPlugin()
+VstPlugin::ExecutableType VstPlugin::detectPluginType(const QString& pluginPath)
 {
-	delete m_pluginWidget;
+	auto pluginType = ExecutableType::Unknown;
+#ifdef LMMS_BUILD_LINUX
+	QFileInfo fi(pluginPath);
+	if (fi.suffix() == "so")
+	{
+		pluginType = ExecutableType::Linux64;
+	}
+	else
+#endif
+	{
+		try {
+			PE::FileInfo peInfo(pluginPath);
+			switch (peInfo.machineType())
+			{
+			case PE::MachineType::amd64:
+				pluginType = ExecutableType::Win64;
+				break;
+			case PE::MachineType::i386:
+				pluginType = ExecutableType::Win32;
+				break;
+			default:
+				qWarning() << "Unknown PE machine type"
+					<< QString::number(static_cast<uint16_t>(peInfo.machineType()), 16);
+				break;
+			}
+		} catch (std::runtime_error& e) {
+			qCritical() << "Error while determining PE file's machine type for" << pluginPath << ":" << e.what();
+		}
+	}
+	return pluginType;
 }
 
 
@@ -311,6 +339,9 @@ void VstPlugin::saveSettings( QDomDocument & _doc, QDomElement & _this )
 
 void VstPlugin::toggleUI()
 {
+	// Ensure plugin is initialized before toggling UI
+	ensureInitialized();
+
 	if ( m_embedMethod == "none" )
 	{
 		RemotePlugin::toggleUI();
@@ -503,6 +534,7 @@ QWidget *VstPlugin::editor()
 
 void VstPlugin::openPreset()
 {
+	ensureInitialized();
 	gui::FileDialog ofd(nullptr, tr("Open Preset"), "", tr("VST Plugin Preset (*.fxp *.fxb)"));
 	ofd.setFileMode(gui::FileDialog::ExistingFiles);
 	if (ofd.exec() == QDialog::Accepted && !ofd.selectedFiles().isEmpty())
@@ -520,6 +552,7 @@ void VstPlugin::openPreset()
 
 void VstPlugin::setProgram( int index )
 {
+	ensureInitialized();
 	lock();
 	sendMessage( message( IdVstSetProgram ).addInt( index ) );
 	waitForMessage( IdVstSetProgram, true );
@@ -531,6 +564,7 @@ void VstPlugin::setProgram( int index )
 
 void VstPlugin::rotateProgram( int offset )
 {
+	ensureInitialized();
 	lock();
 	sendMessage( message( IdVstRotateProgram ).addInt( offset ) );
 	waitForMessage( IdVstRotateProgram, true );
@@ -613,6 +647,7 @@ void VstPlugin::savePreset()
 
 void VstPlugin::setParam( int i, float f )
 {
+	ensureInitialized();
 	lock();
 	sendMessage( message( IdVstSetParameter ).addInt( i ).addFloat( f ) );
 	//waitForMessage( IdVstSetParameter, true );
@@ -630,6 +665,9 @@ void VstPlugin::idleUpdate()
 
 void VstPlugin::showUI()
 {
+	// Ensure plugin is initialized before showing UI
+	ensureInitialized();
+
 	if ( m_embedMethod == "none" )
 	{
 		RemotePlugin::showUI();
@@ -645,9 +683,14 @@ void VstPlugin::showUI()
 
 void VstPlugin::hideUI()
 {
+	// No need to initialize just to hide UI
 	if ( m_embedMethod == "none" )
 	{
-		RemotePlugin::hideUI();
+		// Only call RemotePlugin::hideUI() if process is running
+		if (isRunning() && !failed())
+		{
+			RemotePlugin::hideUI();
+		}
 	}
 	else if ( pluginWidget() != nullptr )
 	{

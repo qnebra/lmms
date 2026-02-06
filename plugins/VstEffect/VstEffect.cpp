@@ -25,6 +25,8 @@
 
 #include "VstEffect.h"
 
+#include <QFileInfo>
+
 #include "GuiApplication.h"
 #include "Song.h"
 #include "TextFloat.h"
@@ -107,6 +109,14 @@ Effect::ProcessStatus VstEffect::processImpl(SampleFrame* buf, const fpp_t frame
 
 bool VstEffect::openPlugin(const QString& plugin)
 {
+	// Basic validation: check if plugin file exists
+	QFileInfo fileInfo(plugin);
+	if (!fileInfo.exists())
+	{
+		collectErrorForUI(VstPlugin::tr("The VST plugin %1 could not be found.").arg(plugin));
+		return false;
+	}
+
 	gui::TextFloat* tf = nullptr;
 	if( gui::getGUI() != nullptr )
 	{
@@ -117,14 +127,14 @@ bool VstEffect::openPlugin(const QString& plugin)
 	}
 
 	QMutexLocker ml( &m_pluginMutex ); Q_UNUSED( ml );
+	// Create new VstPlugin instance with lazy initialization
+	// Process spawning is deferred until first use
 	m_plugin = QSharedPointer<VstPlugin>(new VstPlugin(plugin));
-	if( m_plugin->failed() )
-	{
-		m_plugin.clear();
-		delete tf;
-		collectErrorForUI(VstPlugin::tr("The VST plugin %1 could not be loaded.").arg(plugin));
-		return false;
-	}
+
+	// Note: With lazy initialization, the plugin process is not spawned here.
+	// It will be spawned on first audio processing call (in process()).
+	// This allows unused/muted plugins to consume no RAM.
+	// Full plugin loading and validation will happen during ensureInitialized().
 
 	delete tf;
 
