@@ -277,8 +277,6 @@ void TrackContainerView::performBatchUpdate(std::function<void()> updateFunction
 }
 
 
-
-
 void TrackContainerView::realignTracks()
 {
 	performBatchUpdate([this]() {
@@ -368,6 +366,7 @@ void TrackContainerView::setPixelsPerBar( int ppb )
 	m_ppb = ppb;
 
 	performBatchUpdate([this]() {
+		// tell all TrackContentWidgets to update their background tile pixmap
 		for (const auto& trackView : m_trackViews)
 		{
 			trackView->getTrackContentWidget()->updateBackground();
