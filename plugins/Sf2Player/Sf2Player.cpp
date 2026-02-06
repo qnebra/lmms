@@ -426,10 +426,7 @@ void Sf2Instrument::openFile( const QString & _sf2File, bool updateTrackName )
 		instrumentTrack()->setName( PathUtil::cleanName( _sf2File ) );
 	}
 
-	if( m_fontId >= 0 )
-	{
-		updatePatch();
-	}
+	updatePatch();
 }
 
 
@@ -607,10 +604,7 @@ void Sf2Instrument::reloadSynth()
 		m_synthMutex.unlock();
 
 		// synth program change (set bank and patch)
-		if( m_fontId >= 0 )
-		{
-			updatePatch();
-		}
+		updatePatch();
 	}
 	else
 	{
