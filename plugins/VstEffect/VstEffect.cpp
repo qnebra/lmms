@@ -31,7 +31,6 @@
 #include "Song.h"
 #include "TextFloat.h"
 #include "VstPlugin.h"
-#include "VstPluginPool.h"
 #include "VstSubPluginFeatures.h"
 
 #include "embed.h"
@@ -128,7 +127,9 @@ bool VstEffect::openPlugin(const QString& plugin)
 	}
 
 	QMutexLocker ml( &m_pluginMutex ); Q_UNUSED( ml );
-	m_plugin = VstPluginPool::instance().getOrCreate(plugin);
+	// Create new VstPlugin instance with lazy initialization
+	// Process spawning is deferred until first use
+	m_plugin = QSharedPointer<VstPlugin>(new VstPlugin(plugin));
 	
 	// Note: With lazy initialization, the plugin process is not spawned here.
 	// It will be spawned on first audio processing call (in process()).

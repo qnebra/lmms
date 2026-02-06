@@ -687,8 +687,8 @@ void VstPlugin::hideUI()
 	// No need to initialize just to hide UI
 	if ( m_embedMethod == "none" )
 	{
-		// Only call RemotePlugin::hideUI() if already initialized
-		if (m_lazyInitialized && !failed())
+		// Only call RemotePlugin::hideUI() if process is running
+		if (isRunning() && !failed())
 		{
 			RemotePlugin::hideUI();
 		}
