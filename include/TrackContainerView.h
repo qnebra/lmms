@@ -171,7 +171,7 @@ protected:
 
 	TimePos m_currentPosition;
 
-	void performBatchUpdate(std::function<void()> updateFunction);
+	void performBatchUpdate(const std::function<void()>& updateFunction);
 
 
 private:

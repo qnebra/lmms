@@ -255,11 +255,15 @@ void TrackContainerView::scrollToTrackView( TrackView * _tv )
 
 
 
-void TrackContainerView::performBatchUpdate(std::function<void()> updateFunction)
+void TrackContainerView::performBatchUpdate(const std::function<void()>& updateFunction)
 {
+	// Save current update state
+	bool wasUpdatesEnabled = updatesEnabled();
+	QWidget* scrollContent = m_scrollArea->widget();
+	bool scrollWasUpdatesEnabled = scrollContent ? scrollContent->updatesEnabled() : true;
+	
 	// Block updates
 	setUpdatesEnabled(false);
-	QWidget* scrollContent = m_scrollArea->widget();
 	if (scrollContent)
 	{
 		scrollContent->setUpdatesEnabled(false);
@@ -268,12 +272,15 @@ void TrackContainerView::performBatchUpdate(std::function<void()> updateFunction
 	// Execute the batch update
 	updateFunction();
 
-	// Re-enable updates
+	// Re-fetch scroll content in case updateFunction modified the widget tree
+	scrollContent = m_scrollArea->widget();
+	
+	// Restore previous update state
 	if (scrollContent)
 	{
-		scrollContent->setUpdatesEnabled(true);
+		scrollContent->setUpdatesEnabled(scrollWasUpdatesEnabled);
 	}
-	setUpdatesEnabled(true);
+	setUpdatesEnabled(wasUpdatesEnabled);
 }
 
 
@@ -283,9 +290,15 @@ void TrackContainerView::realignTracks()
 		for (const auto& trackView : m_trackViews)
 		{
 			trackView->show();
-			trackView->update();
 		}
 	});
+
+	// Trigger single consolidated repaint
+	QWidget* scrollContent = m_scrollArea->widget();
+	if (scrollContent)
+	{
+		scrollContent->update();
+	}
 
 	emit tracksRealigned();
 }
