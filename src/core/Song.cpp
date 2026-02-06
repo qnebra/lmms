@@ -162,9 +162,9 @@ void Song::setTempo()
 		auto nph = dynamic_cast<NotePlayHandle*>(playHandle);
 		if( nph && !nph->isReleased() )
 		{
-			nph->lock();
+			// No locking needed - requestChangeInModel() already ensures
+			// exclusive access to all PlayHandles
 			nph->resize( tempo );
-			nph->unlock();
 		}
 	}
 	Engine::audioEngine()->doneChangeInModel();
