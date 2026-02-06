@@ -436,10 +436,9 @@ void Sf2Instrument::updatePatch()
 {
 	if( m_fontId >= 0 && m_bankNum.value() >= 0 && m_patchNum.value() >= 0 )
 	{
-		m_synthMutex.lock();
+		const auto guard = std::lock_guard{m_synthMutex};
 		fluid_synth_program_select( m_synth, m_channel, m_fontId,
 				m_bankNum.value(), m_patchNum.value() );
-		m_synthMutex.unlock();
 	}
 }
 
