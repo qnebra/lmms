@@ -78,16 +78,14 @@ namespace lmms
 
 using timeMap = AutomationClip::timeMap;
 
-{
-	// Calculate dynamic bar length based on time signature
-	// Maintains 192 ticks as base unit for 4/4 time (backward compatible)
-	inline int getTicksPerBar(int numerator, int denominator)
+// Calculate dynamic bar length based on time signature
+// Maintains 192 ticks as base unit for 4/4 time (backward compatible)
+inline int getTicksPerBar(int numerator, int denominator)
 	{
-		return (DefaultTicksPerBar * numerator) / denominator;
+	return (DefaultTicksPerBar * numerator) / denominator;
 	}
-}
 
-
+int actualTicksPerBar = DefaultTicksPerBar;
 
 namespace gui
 {
