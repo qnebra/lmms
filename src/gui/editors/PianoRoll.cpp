@@ -76,8 +76,17 @@
 namespace lmms
 {
 
-
 using timeMap = AutomationClip::timeMap;
+
+{
+	// Calculate dynamic bar length based on time signature
+	// Maintains 192 ticks as base unit for 4/4 time (backward compatible)
+	inline int getTicksPerBar(int numerator, int denominator)
+	{
+		return (DefaultTicksPerBar * numerator) / denominator;
+	}
+}
+
 
 
 namespace gui
@@ -3568,35 +3577,38 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 		p.setClipRect(m_whiteKeyWidth, keyAreaTop(), width(), noteEditBottom() - keyAreaTop());
 
 		// draw alternating shading on bars
-		float timeSignature =
-			static_cast<float>(Engine::getSong()->getTimeSigModel().getNumerator()) /
-			static_cast<float>(Engine::getSong()->getTimeSigModel().getDenominator());
-		float zoomFactor = m_zoomLevels[m_zoomingModel.value()];
-		//the bars which disappears at the left side by scrolling
-		int leftBars = m_currentPosition * zoomFactor / TimePos::ticksPerBar();
-		//iterates the visible bars and draw the shading on uneven bars
-		for (int x = m_whiteKeyWidth, barCount = leftBars;
-			x < width() + m_currentPosition * zoomFactor / timeSignature;
-			x += m_ppb, ++barCount)
+		int actualTicksPerBar = getTicksPerBar(
+			Engine::getSong()->getTimeSigModel().getNumerator(),
+			Engine::getSong()->getTimeSigModel().getDenominator()
+		);
+		int leftBars = m_currentPosition / actualTicksPerBar;
+		int pixelsPerBar = actualTicksPerBar * m_ppb / TimePos::ticksPerBar();
+		
+		for (int barIndex = leftBars, 
+		     x = m_whiteKeyWidth - ((m_currentPosition % actualTicksPerBar) * m_ppb / TimePos::ticksPerBar());
+			x < width();
+			x += pixelsPerBar, ++barIndex)
 		{
-			if ((barCount + leftBars) % 2 != 0)
+			if (barIndex % 2 != 0)
 			{
-				p.fillRect(x - m_currentPosition * zoomFactor / timeSignature,
+				p.fillRect(x,
 					PR_TOP_MARGIN,
-					m_ppb,
+					pixelsPerBar,
 					height() - (PR_BOTTOM_MARGIN + PR_TOP_MARGIN),
 					m_backgroundShade);
 			}
 		}
 
-		// draw vertical beat lines
-		int ticksPerBeat = DefaultTicksPerBar /
-			Engine::getSong()->getTimeSigModel().getDenominator();
-		p.setPen(m_beatLineColor);
-		for(tick = m_currentPosition - m_currentPosition % ticksPerBeat,
+		// draw vertical bar lines
+		actualTicksPerBar = getTicksPerBar(
+			Engine::getSong()->getTimeSigModel().getNumerator(),
+			Engine::getSong()->getTimeSigModel().getDenominator()
+		);
+		p.setPen(m_barLineColor);
+		for(tick = m_currentPosition - m_currentPosition % actualTicksPerBar,
 			x = xCoordOfTick( tick );
 			x <= width();
-			tick += ticksPerBeat, x = xCoordOfTick(tick))
+			tick += actualTicksPerBar, x = xCoordOfTick(tick))
 		{
 			p.drawLine(x, PR_TOP_MARGIN, x, noteEditBottom());
 		}
