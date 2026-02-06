@@ -3569,10 +3569,17 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 		const TimeSig timeSig(Engine::getSong()->getTimeSigModel());
 		const tick_t actualTicksPerBar = TimePos::ticksPerBar(timeSig);
 		int leftBars = m_currentPosition / actualTicksPerBar;
-		int pixelsPerBar = actualTicksPerBar * m_ppb / TimePos::ticksPerBar();
 		
+		const qreal pixelsPerTick = static_cast<qreal>(m_ppb) / TimePos::ticksPerBar();
+		// Ensure at least 1 pixel per bar to prevent infinite loops in drawing logic
+		const int pixelsPerBar = std::max(1, qRound(pixelsPerTick * actualTicksPerBar));
+
+		const tick_t offsetTicksInBar = m_currentPosition % actualTicksPerBar;
+		const qreal offsetPixels = pixelsPerTick * offsetTicksInBar;
+		const int xStart = m_whiteKeyWidth - qRound(offsetPixels);
+
 		for (int barIndex = leftBars, 
-		     x = m_whiteKeyWidth - ((m_currentPosition % actualTicksPerBar) * m_ppb / TimePos::ticksPerBar());
+		     x = xStart;
 			x < width();
 			x += pixelsPerBar, ++barIndex)
 		{
@@ -3587,7 +3594,9 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 		}
 
 		// draw vertical beat lines
-		const tick_t ticksPerBeat = actualTicksPerBar / std::max(1, timeSig.numerator());
+		const tick_t ticksPerBeat = std::max<tick_t>(
+			1,
+			actualTicksPerBar / std::max(1, timeSig.numerator()));
 		p.setPen(m_beatLineColor);
 		for(tick = m_currentPosition - m_currentPosition % ticksPerBeat,
 			x = xCoordOfTick( tick );
