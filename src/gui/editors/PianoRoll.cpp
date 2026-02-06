@@ -3568,42 +3568,49 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 		// draw alternating shading on bars
 		const TimeSig timeSig(Engine::getSong()->getTimeSigModel());
 		const tick_t actualTicksPerBar = TimePos::ticksPerBar(timeSig);
-		int leftBars = m_currentPosition / actualTicksPerBar;
+		tick_t leftBars = m_currentPosition / actualTicksPerBar;
 		
-		const qreal pixelsPerTick = static_cast<qreal>(m_ppb) / TimePos::ticksPerBar();
-		// Ensure at least 1 pixel per bar to prevent infinite loops in drawing logic
-		const int pixelsPerBar = std::max(1, qRound(pixelsPerTick * actualTicksPerBar));
-
-		const tick_t offsetTicksInBar = m_currentPosition % actualTicksPerBar;
-		const qreal offsetPixels = pixelsPerTick * offsetTicksInBar;
-		const int xStart = m_whiteKeyWidth - qRound(offsetPixels);
-
-		for (int barIndex = leftBars, 
-		     x = xStart;
-			x < width();
-			x += pixelsPerBar, ++barIndex)
+		// Compute starting tick aligned to bar boundary
+		const tick_t startTick = m_currentPosition - (m_currentPosition % actualTicksPerBar);
+		
+		for (tick_t barIndex = leftBars, tick = startTick;
+			xCoordOfTick(tick) < width();
+			tick += actualTicksPerBar, ++barIndex)
 		{
 			if (barIndex % 2 != 0)
 			{
+				const int x = xCoordOfTick(tick);
+				const int nextX = xCoordOfTick(tick + actualTicksPerBar);
+				const int barWidth = nextX - x;
+				
 				p.fillRect(x,
 					PR_TOP_MARGIN,
-					pixelsPerBar,
+					barWidth,
 					height() - (PR_BOTTOM_MARGIN + PR_TOP_MARGIN),
 					m_backgroundShade);
 			}
 		}
 
 		// draw vertical beat lines
-		const tick_t ticksPerBeat = std::max<tick_t>(
-			1,
-			actualTicksPerBar / std::max(1, timeSig.numerator()));
 		p.setPen(m_beatLineColor);
-		for(tick = m_currentPosition - m_currentPosition % ticksPerBeat,
-			x = xCoordOfTick( tick );
-			x <= width();
-			tick += ticksPerBeat, x = xCoordOfTick(tick))
+		const tick_t barStartTick = m_currentPosition - (m_currentPosition % actualTicksPerBar);
+		const int numerator = std::max(1, timeSig.numerator());
+		
+		// Draw beat lines for all visible bars
+		for (tick_t barTick = barStartTick; xCoordOfTick(barTick) <= width(); barTick += actualTicksPerBar)
 		{
-			p.drawLine(x, PR_TOP_MARGIN, x, noteEditBottom());
+			// Draw beat lines within this bar
+			for (int beatIndex = 0; beatIndex < numerator; ++beatIndex)
+			{
+				// Use floating point division to avoid truncation errors
+				const tick_t beatTick = barTick + qRound(beatIndex * static_cast<qreal>(actualTicksPerBar) / numerator);
+				const int x = xCoordOfTick(beatTick);
+				
+				if (x >= m_whiteKeyWidth && x <= width())
+				{
+					p.drawLine(x, PR_TOP_MARGIN, x, noteEditBottom());
+				}
+			}
 		}
 
 		// draw vertical bar lines
