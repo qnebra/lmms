@@ -85,10 +85,20 @@ public:
 	~TimeLineWidget() override;
 
 	inline QColor const & getBarLineColor() const { return m_barLineColor; }
-	inline void setBarLineColor(QColor const & barLineColor) { m_barLineColor = barLineColor; }
+	inline void setBarLineColor(QColor const & barLineColor) 
+	{ 
+		m_barLineColor = barLineColor; 
+		m_backgroundDirty = true;
+		update();
+	}
 
 	inline QColor const & getBarNumberColor() const { return m_barNumberColor; }
-	inline void setBarNumberColor(QColor const & barNumberColor) { m_barNumberColor = barNumberColor; }
+	inline void setBarNumberColor(QColor const & barNumberColor) 
+	{ 
+		m_barNumberColor = barNumberColor; 
+		m_backgroundDirty = true;
+		update();
+	}
 
 	inline QColor const & getInactiveLoopColor() const { return m_inactiveLoopColor; }
 	inline void setInactiveLoopColor(QColor const & inactiveLoopColor) { m_inactiveLoopColor = inactiveLoopColor; }
