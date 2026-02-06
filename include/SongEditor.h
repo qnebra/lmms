@@ -31,6 +31,7 @@
 
 class QLabel;
 class QScrollBar;
+class QTimer;
 
 namespace lmms
 {
@@ -45,10 +46,12 @@ namespace gui
 
 class ActionGroup;
 class AutomatableSlider;
+class ClipView;
 class ComboBox;
 class LcdSpinBox;
 class MeterDialog;
 class PositionLine;
+class selectableObject;
 class TextFloat;
 class TimeLineWidget;
 
@@ -113,6 +116,8 @@ private slots:
 	void updateScrollBar(int len);
 
 	void zoomingChanged();
+	void applyZoomChange();
+	void schedulePositionLineUpdate();
 
 private:
 	void keyPressEvent( QKeyEvent * ke ) override;
@@ -126,6 +131,8 @@ private:
 
 	int trackIndexFromSelectionPoint(int yPos);
 	int indexOfTrackView(const TrackView* tv);
+
+	void updateSelectableObjectsCache();
 
 	Song * m_song;
 
@@ -164,6 +171,14 @@ private:
 	int m_rubberbandPixelsPerBar; //!< pixels per bar when selection starts
 	int m_trackHeadWidth;
 	bool m_selectRegion;
+
+	// Performance optimization members
+	QTimer* m_zoomUpdateTimer;
+	int m_pendingPixelsPerBar;
+	QVector<selectableObject*> m_cachedSelectableObjects;
+	QVector<ClipView*> m_cachedClipViews;
+	bool m_selectableObjectsCacheDirty;
+	bool m_positionLineUpdatePending;
 
 	friend class SongEditorWindow;
 
