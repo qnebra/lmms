@@ -118,6 +118,9 @@ const int INITIAL_START_KEY = Octave::Octave_4 + Key::C;
 const int NUM_EVEN_LENGTHS = 6;
 const int NUM_TRIPLET_LENGTHS = 5;
 
+// Performance optimization: zoom debounce interval in milliseconds (~60fps)
+const int ZOOM_DEBOUNCE_INTERVAL_MS = 16;
+
 // Radius of the automation node circles which appear when pitchbending a note
 const int DETUNING_HANDLE_RADIUS = 3;
 
@@ -336,12 +339,12 @@ PianoRoll::PianoRoll() :
 	// Initialize zoom debouncing timers
 	m_zoomXUpdateTimer = new QTimer(this);
 	m_zoomXUpdateTimer->setSingleShot(true);
-	m_zoomXUpdateTimer->setInterval(16); // ~60fps
+	m_zoomXUpdateTimer->setInterval(ZOOM_DEBOUNCE_INTERVAL_MS);
 	connect(m_zoomXUpdateTimer, &QTimer::timeout, this, &PianoRoll::applyZoomXChange);
 
 	m_zoomYUpdateTimer = new QTimer(this);
 	m_zoomYUpdateTimer->setSingleShot(true);
-	m_zoomYUpdateTimer->setInterval(16); // ~60fps
+	m_zoomYUpdateTimer->setInterval(ZOOM_DEBOUNCE_INTERVAL_MS);
 	connect(m_zoomYUpdateTimer, &QTimer::timeout, this, &PianoRoll::applyZoomYChange);
 
 	// Initialize note caching
@@ -4608,6 +4611,7 @@ void PianoRoll::selectAll()
 
 
 // returns vector with pointers to all selected notes
+// Note: This method is only called from the UI thread (Qt single-threaded UI model)
 NoteVector PianoRoll::getSelectedNotes() const
 {
 	if (m_notesCacheDirty)
@@ -4635,6 +4639,8 @@ void PianoRoll::updateNotesCache() const
 		return;
 	}
 	
+	// Intentionally copy the notes vector to create a stable cache snapshot.
+	// This prevents issues if the original notes vector is modified while iterating.
 	m_cachedNotes = m_midiClip->notes();
 	m_notesCacheDirty = false;
 }
