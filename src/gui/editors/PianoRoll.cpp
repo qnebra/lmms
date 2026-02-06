@@ -78,15 +78,6 @@ namespace lmms
 
 using timeMap = AutomationClip::timeMap;
 
-// Calculate dynamic bar length based on time signature
-// Maintains 192 ticks as base unit for 4/4 time (backward compatible)
-inline int getTicksPerBar(int numerator, int denominator)
-	{
-	return (DefaultTicksPerBar * numerator) / denominator;
-	}
-
-int actualTicksPerBar = DefaultTicksPerBar;
-
 namespace gui
 {
 
@@ -3575,10 +3566,8 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 		p.setClipRect(m_whiteKeyWidth, keyAreaTop(), width(), noteEditBottom() - keyAreaTop());
 
 		// draw alternating shading on bars
-		int actualTicksPerBar = getTicksPerBar(
-			Engine::getSong()->getTimeSigModel().getNumerator(),
-			Engine::getSong()->getTimeSigModel().getDenominator()
-		);
+		const TimeSig timeSig(Engine::getSong()->getTimeSigModel());
+		const tick_t actualTicksPerBar = TimePos::ticksPerBar(timeSig);
 		int leftBars = m_currentPosition / actualTicksPerBar;
 		int pixelsPerBar = actualTicksPerBar * m_ppb / TimePos::ticksPerBar();
 		
@@ -3597,26 +3586,23 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 			}
 		}
 
-		// draw vertical bar lines
-		actualTicksPerBar = getTicksPerBar(
-			Engine::getSong()->getTimeSigModel().getNumerator(),
-			Engine::getSong()->getTimeSigModel().getDenominator()
-		);
-		p.setPen(m_barLineColor);
-		for(tick = m_currentPosition - m_currentPosition % actualTicksPerBar,
+		// draw vertical beat lines
+		const tick_t ticksPerBeat = actualTicksPerBar / std::max(1, timeSig.numerator());
+		p.setPen(m_beatLineColor);
+		for(tick = m_currentPosition - m_currentPosition % ticksPerBeat,
 			x = xCoordOfTick( tick );
 			x <= width();
-			tick += actualTicksPerBar, x = xCoordOfTick(tick))
+			tick += ticksPerBeat, x = xCoordOfTick(tick))
 		{
 			p.drawLine(x, PR_TOP_MARGIN, x, noteEditBottom());
 		}
 
 		// draw vertical bar lines
 		p.setPen(m_barLineColor);
-		for(tick = m_currentPosition - m_currentPosition % TimePos::ticksPerBar(),
+		for(tick = m_currentPosition - m_currentPosition % actualTicksPerBar,
 			x = xCoordOfTick( tick );
 			x <= width();
-			tick += TimePos::ticksPerBar(), x = xCoordOfTick(tick))
+			tick += actualTicksPerBar, x = xCoordOfTick(tick))
 		{
 			p.drawLine(x, PR_TOP_MARGIN, x, noteEditBottom());
 		}
