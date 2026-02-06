@@ -25,6 +25,7 @@
 #ifndef LMMS_GUI_TRACK_CONTAINER_VIEW_H
 #define LMMS_GUI_TRACK_CONTAINER_VIEW_H
 
+#include <functional>
 #include <QVector>
 #include <QScrollArea>
 #include <QWidget>
@@ -169,6 +170,8 @@ protected:
 	static const int DEFAULT_PIXELS_PER_BAR = 128;
 
 	TimePos m_currentPosition;
+
+	void performBatchUpdate(std::function<void()> updateFunction);
 
 
 private:
