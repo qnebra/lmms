@@ -29,6 +29,7 @@
 #include "Song.h"
 #include "TextFloat.h"
 #include "VstPlugin.h"
+#include "VstPluginPool.h"
 #include "VstSubPluginFeatures.h"
 
 #include "embed.h"
@@ -117,7 +118,7 @@ bool VstEffect::openPlugin(const QString& plugin)
 	}
 
 	QMutexLocker ml( &m_pluginMutex ); Q_UNUSED( ml );
-	m_plugin = QSharedPointer<VstPlugin>(new VstPlugin(plugin));
+	m_plugin = VstPluginPool::instance().getOrCreate(plugin);
 	if( m_plugin->failed() )
 	{
 		m_plugin.clear();

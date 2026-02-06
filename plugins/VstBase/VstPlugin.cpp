@@ -116,11 +116,6 @@ private:
 namespace lmms
 {
 
-enum class ExecutableType
-{
-	Unknown, Win32, Win64, Linux64,
-};
-
 VstPlugin::VstPlugin( const QString & _plugin ) :
 	m_plugin( PathUtil::toAbsolute(_plugin) ),
 	m_pluginWindowID( 0 ),
@@ -128,13 +123,84 @@ VstPlugin::VstPlugin( const QString & _plugin ) :
 			? ConfigManager::inst()->vstEmbedMethod()
 			: "headless" ),
 	m_version( 0 ),
-	m_currentProgram()
+	m_currentProgram(),
+	m_lazyInitialized( false ),
+	m_pluginPath( PathUtil::toAbsolute(_plugin) )
 {
 	setSplittedChannels( true );
 
+	// Defer plugin loading and process spawning to ensureInitialized()
+	// This allows fast construction and lazy loading on first use
+
+	// Note: Signal connections and timer setup moved to ensureInitialized()
+}
+
+
+
+
+VstPlugin::~VstPlugin()
+{
+	delete m_pluginWidget;
+}
+
+
+
+
+void VstPlugin::ensureInitialized()
+{
+	// Check if already initialized
+	if (m_lazyInitialized)
+	{
+		return;
+	}
+
+	m_lazyInitialized = true;
+
+	qDebug() << "VstPlugin: Lazy initialization for" << m_pluginPath;
+
+	// Detect plugin type and load appropriate RemoteVstPlugin executable
+	auto pluginType = detectPluginType(m_pluginPath);
+
+	switch(pluginType)
+	{
+	case ExecutableType::Win64:
+		tryLoad( REMOTE_VST_PLUGIN_FILEPATH_64 ); // Default: RemoteVstPlugin64
+		break;
+	case ExecutableType::Win32:
+		tryLoad( REMOTE_VST_PLUGIN_FILEPATH_32 ); // Default: 32/RemoteVstPlugin32
+		break;
+#ifdef LMMS_BUILD_LINUX
+	case ExecutableType::Linux64:
+		tryLoad( NATIVE_LINUX_REMOTE_VST_PLUGIN_FILEPATH_64 ); // Default: NativeLinuxRemoteVstPlugin64
+		break;
+#endif
+	default:
+		m_failed = true;
+		return;
+	}
+
+	// Setup signal connections and timer
+	setTempo( Engine::getSong()->getTempo() );
+
+	connect( Engine::getSong(), SIGNAL( tempoChanged( lmms::bpm_t ) ),
+			this, SLOT( setTempo( lmms::bpm_t ) ), Qt::DirectConnection );
+	connect( Engine::audioEngine(), SIGNAL( sampleRateChanged() ),
+				this, SLOT( updateSampleRate() ) );
+
+	// update once per second
+	m_idleTimer.start( 1000 );
+	connect( &m_idleTimer, SIGNAL( timeout() ),
+				this, SLOT( idleUpdate() ) );
+}
+
+
+
+
+VstPlugin::ExecutableType VstPlugin::detectPluginType(const QString& pluginPath)
+{
 	auto pluginType = ExecutableType::Unknown;
 #ifdef LMMS_BUILD_LINUX
-	QFileInfo fi(m_plugin);
+	QFileInfo fi(pluginPath);
 	if (fi.suffix() == "so")
 	{
 		pluginType = ExecutableType::Linux64;
@@ -143,7 +209,7 @@ VstPlugin::VstPlugin( const QString & _plugin ) :
 #endif
 	{
 		try {
-			PE::FileInfo peInfo(m_plugin);
+			PE::FileInfo peInfo(pluginPath);
 			switch (peInfo.machineType())
 			{
 			case PE::MachineType::amd64:
@@ -161,44 +227,7 @@ VstPlugin::VstPlugin( const QString & _plugin ) :
 			qCritical() << "Error while determining PE file's machine type: " << e.what();
 		}
 	}
-
-	switch(pluginType)
-	{
-	case ExecutableType::Win64:
-		tryLoad( REMOTE_VST_PLUGIN_FILEPATH_64 ); // Default: RemoteVstPlugin64
-		break;
-	case ExecutableType::Win32:
-		tryLoad( REMOTE_VST_PLUGIN_FILEPATH_32 ); // Default: 32/RemoteVstPlugin32
-		break;
-#ifdef LMMS_BUILD_LINUX
-	case ExecutableType::Linux64:
-		tryLoad( NATIVE_LINUX_REMOTE_VST_PLUGIN_FILEPATH_64 ); // Default: NativeLinuxRemoteVstPlugin32
-		break;
-#endif
-	default:
-		m_failed = true;
-		return;
-	}
-
-	setTempo( Engine::getSong()->getTempo() );
-
-	connect( Engine::getSong(), SIGNAL( tempoChanged( lmms::bpm_t ) ),
-			this, SLOT( setTempo( lmms::bpm_t ) ), Qt::DirectConnection );
-	connect( Engine::audioEngine(), SIGNAL( sampleRateChanged() ),
-				this, SLOT( updateSampleRate() ) );
-
-	// update once per second
-	m_idleTimer.start( 1000 );
-	connect( &m_idleTimer, SIGNAL( timeout() ),
-				this, SLOT( idleUpdate() ) );
-}
-
-
-
-
-VstPlugin::~VstPlugin()
-{
-	delete m_pluginWidget;
+	return pluginType;
 }
 
 
