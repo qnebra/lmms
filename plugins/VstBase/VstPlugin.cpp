@@ -124,8 +124,7 @@ VstPlugin::VstPlugin( const QString & _plugin ) :
 			: "headless" ),
 	m_version( 0 ),
 	m_currentProgram(),
-	m_lazyInitialized( false ),
-	m_pluginPath( PathUtil::toAbsolute(_plugin) )
+	m_lazyInitialized( false )
 {
 	setSplittedChannels( true );
 
@@ -156,10 +155,10 @@ void VstPlugin::ensureInitialized()
 
 	m_lazyInitialized = true;
 
-	qDebug() << "VstPlugin: Lazy initialization for" << m_pluginPath;
+	qDebug() << "VstPlugin: Lazy initialization for" << m_plugin;
 
 	// Detect plugin type and load appropriate RemoteVstPlugin executable
-	auto pluginType = detectPluginType(m_pluginPath);
+	auto pluginType = detectPluginType(m_plugin);
 
 	switch(pluginType)
 	{
@@ -224,7 +223,7 @@ VstPlugin::ExecutableType VstPlugin::detectPluginType(const QString& pluginPath)
 				break;
 			}
 		} catch (std::runtime_error& e) {
-			qCritical() << "Error while determining PE file's machine type: " << e.what();
+			qCritical() << "Error while determining PE file's machine type for" << pluginPath << ":" << e.what();
 		}
 	}
 	return pluginType;
@@ -342,7 +341,7 @@ void VstPlugin::toggleUI()
 {
 	// Ensure plugin is initialized before toggling UI
 	ensureInitialized();
-	
+
 	if ( m_embedMethod == "none" )
 	{
 		RemotePlugin::toggleUI();
@@ -668,7 +667,7 @@ void VstPlugin::showUI()
 {
 	// Ensure plugin is initialized before showing UI
 	ensureInitialized();
-	
+
 	if ( m_embedMethod == "none" )
 	{
 		RemotePlugin::showUI();

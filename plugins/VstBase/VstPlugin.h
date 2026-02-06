@@ -183,7 +183,6 @@ private:
 
 	// Lazy initialization support
 	bool m_lazyInitialized;
-	QString m_pluginPath;
 
 } ;
 

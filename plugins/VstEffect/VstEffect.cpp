@@ -130,7 +130,7 @@ bool VstEffect::openPlugin(const QString& plugin)
 	// Create new VstPlugin instance with lazy initialization
 	// Process spawning is deferred until first use
 	m_plugin = QSharedPointer<VstPlugin>(new VstPlugin(plugin));
-	
+
 	// Note: With lazy initialization, the plugin process is not spawned here.
 	// It will be spawned on first audio processing call (in process()).
 	// This allows unused/muted plugins to consume no RAM.
