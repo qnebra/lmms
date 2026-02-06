@@ -172,6 +172,9 @@ protected slots:
 		update();
 	}
 
+	void applyZoomXChange();
+	void applyZoomYChange();
+
 private:
 
 	enum class Action
@@ -292,6 +295,12 @@ private:
 	QColor m_outOfBoundsShade;
 	
 	SampleThumbnail m_sampleThumbnail;
+
+	// Zoom debouncing
+	QTimer* m_zoomXUpdateTimer;
+	QTimer* m_zoomYUpdateTimer;
+	int m_pendingZoomX;
+	int m_pendingZoomY;
 
 	friend class AutomationEditorWindow;
 

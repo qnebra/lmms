@@ -140,6 +140,7 @@ public:
 	inline void setPixelsPerBar( float ppb )
 	{
 		m_ppb = ppb;
+		m_backgroundDirty = true;
 		update();
 	}
 
@@ -180,6 +181,7 @@ protected:
 	void mousePressEvent( QMouseEvent * _me ) override;
 	void mouseMoveEvent( QMouseEvent * _me ) override;
 	void mouseReleaseEvent( QMouseEvent * _me ) override;
+	void resizeEvent( QResizeEvent * _re ) override;
 	void contextMenuEvent(QContextMenuEvent* event) override;
 
 private:
@@ -241,6 +243,14 @@ private:
 	int m_initalXSelect;
 
 	Action m_action = Action::NoAction;
+
+	// Background caching
+	QPixmap m_cachedBackground;
+	int m_cachedPPB;
+	int m_cachedWidth;
+	bool m_backgroundDirty;
+
+	void renderBackground();
 };
 
 } // namespace lmms::gui
