@@ -3568,12 +3568,12 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 		// draw alternating shading on bars
 		const TimeSig timeSig(Engine::getSong()->getTimeSigModel());
 		const tick_t actualTicksPerBar = TimePos::ticksPerBar(timeSig);
-		tick_t leftBars = m_currentPosition / actualTicksPerBar;
 		
 		// Compute starting tick aligned to bar boundary
-		const tick_t startTick = m_currentPosition - (m_currentPosition % actualTicksPerBar);
+		const tick_t barStartTick = m_currentPosition - (m_currentPosition % actualTicksPerBar);
+		const tick_t leftBars = m_currentPosition / actualTicksPerBar;
 		
-		for (tick_t barIndex = leftBars, tick = startTick;
+		for (tick_t barIndex = leftBars, tick = barStartTick;
 			xCoordOfTick(tick) < width();
 			tick += actualTicksPerBar, ++barIndex)
 		{
@@ -3593,8 +3593,8 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 
 		// draw vertical beat lines
 		p.setPen(m_beatLineColor);
-		const tick_t barStartTick = m_currentPosition - (m_currentPosition % actualTicksPerBar);
 		const int numerator = std::max(1, timeSig.numerator());
+		const qreal ticksPerBeat = static_cast<qreal>(actualTicksPerBar) / numerator;
 		
 		// Draw beat lines for all visible bars
 		for (tick_t barTick = barStartTick; xCoordOfTick(barTick) <= width(); barTick += actualTicksPerBar)
@@ -3603,7 +3603,7 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 			for (int beatIndex = 0; beatIndex < numerator; ++beatIndex)
 			{
 				// Use floating point division to avoid truncation errors
-				const tick_t beatTick = barTick + qRound(beatIndex * static_cast<qreal>(actualTicksPerBar) / numerator);
+				const tick_t beatTick = barTick + qRound(beatIndex * ticksPerBeat);
 				const int x = xCoordOfTick(beatTick);
 				
 				if (x >= m_whiteKeyWidth && x <= width())
