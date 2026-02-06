@@ -561,11 +561,11 @@ private:
 	int m_pendingZoomY;
 
 	// Performance optimization: note caching
-	NoteVector m_cachedNotes;
-	bool m_notesCacheDirty;
+	mutable NoteVector m_cachedNotes;
+	mutable bool m_notesCacheDirty;
 
 	// Private methods for optimization
-	void updateNotesCache();
+	void updateNotesCache() const;
 } ;
 
 

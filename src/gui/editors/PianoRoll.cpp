@@ -4612,7 +4612,7 @@ NoteVector PianoRoll::getSelectedNotes() const
 {
 	if (m_notesCacheDirty)
 	{
-		const_cast<PianoRoll*>(this)->updateNotesCache();
+		updateNotesCache();
 	}
 	
 	NoteVector selectedNotes;
@@ -4626,7 +4626,7 @@ NoteVector PianoRoll::getSelectedNotes() const
 	return selectedNotes;
 }
 
-void PianoRoll::updateNotesCache()
+void PianoRoll::updateNotesCache() const
 {
 	if (!hasValidMidiClip())
 	{
