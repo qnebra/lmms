@@ -28,6 +28,7 @@
 #define LMMS_GUI_PIANO_ROLL_H
 
 #include <QWidget>
+#include <QTimer>
 
 #include <vector>
 
@@ -255,6 +256,11 @@ signals:
 	void ghostClipSet(bool);
 	void semiToneMarkerMenuScaleSetEnabled(bool);
 	void semiToneMarkerMenuChordSetEnabled(bool);
+
+
+private slots:
+	void applyZoomXChange();
+	void applyZoomYChange();
 
 
 private:
@@ -547,6 +553,19 @@ private:
 	QBrush m_blackKeyActiveBackground;
 	QBrush m_blackKeyInactiveBackground;
 	QBrush m_blackKeyDisabledBackground;
+
+	// Performance optimization: zoom debouncing
+	QTimer* m_zoomXUpdateTimer;
+	QTimer* m_zoomYUpdateTimer;
+	int m_pendingZoomX;
+	int m_pendingZoomY;
+
+	// Performance optimization: note caching
+	mutable NoteVector m_cachedNotes;
+	mutable bool m_notesCacheDirty;
+
+	// Private methods for optimization
+	void updateNotesCache() const;
 } ;
 
 

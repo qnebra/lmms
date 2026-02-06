@@ -118,6 +118,9 @@ const int INITIAL_START_KEY = Octave::Octave_4 + Key::C;
 const int NUM_EVEN_LENGTHS = 6;
 const int NUM_TRIPLET_LENGTHS = 5;
 
+// Performance optimization: zoom debounce interval in milliseconds (~60fps)
+const int ZOOM_DEBOUNCE_INTERVAL_MS = 16;
+
 // Radius of the automation node circles which appear when pitchbending a note
 const int DETUNING_HANDLE_RADIUS = 3;
 
@@ -332,6 +335,20 @@ PianoRoll::PianoRoll() :
 	m_zoomingYModel.setValue(m_zoomingYModel.findText("100%"));
 	connect(&m_zoomingYModel, SIGNAL(dataChanged()),
 					this, SLOT(zoomingYChanged()));
+
+	// Initialize zoom debouncing timers
+	m_zoomXUpdateTimer = new QTimer(this);
+	m_zoomXUpdateTimer->setSingleShot(true);
+	m_zoomXUpdateTimer->setInterval(ZOOM_DEBOUNCE_INTERVAL_MS);
+	connect(m_zoomXUpdateTimer, &QTimer::timeout, this, &PianoRoll::applyZoomXChange);
+
+	m_zoomYUpdateTimer = new QTimer(this);
+	m_zoomYUpdateTimer->setSingleShot(true);
+	m_zoomYUpdateTimer->setInterval(ZOOM_DEBOUNCE_INTERVAL_MS);
+	connect(m_zoomYUpdateTimer, &QTimer::timeout, this, &PianoRoll::applyZoomYChange);
+
+	// Initialize note caching
+	m_notesCacheDirty = true;
 
 	// Set up quantization model
 	m_quantizeModel.addItem( tr( "Note lock" ) );
@@ -698,6 +715,9 @@ void PianoRoll::glueNotes()
 		{
 			m_midiClip->removeNote(noteToRemove[i]);
 		}
+		
+		// Invalidate note cache after removing notes
+		m_notesCacheDirty = true;
 
 		update();
 	}
@@ -852,6 +872,9 @@ void PianoRoll::setCurrentMidiClip( MidiClip* newMidiClip )
 	m_startKey = INITIAL_START_KEY;
 
 	m_stepRecorder.setCurrentMidiClip(newMidiClip);
+	
+	// Invalidate note cache when clip changes
+	m_notesCacheDirty = true;
 
 	if( ! hasValidMidiClip() )
 	{
@@ -1869,6 +1892,9 @@ void PianoRoll::mousePressEvent(QMouseEvent * me )
 					{
 						++it;
 					}
+					
+					// Invalidate note cache after adding notes
+					m_notesCacheDirty = true;
 				}
 
 				Note *current_note = *it;
@@ -1966,6 +1992,9 @@ void PianoRoll::mousePressEvent(QMouseEvent * me )
 							Engine::getSong()->setModified();
 							update();
 							getGUI()->songEditor()->update();
+							
+							// Invalidate note cache after adding notes
+							m_notesCacheDirty = true;
 						}
 					}
 
@@ -1986,6 +2015,9 @@ void PianoRoll::mousePressEvent(QMouseEvent * me )
 					m_midiClip->addJournalCheckPoint();
 					m_midiClip->removeNote( *it );
 					Engine::getSong()->setModified();
+					
+					// Invalidate note cache after removing note
+					m_notesCacheDirty = true;
 				}
 			}
 			else if( me->button() == Qt::LeftButton &&
@@ -2783,6 +2815,9 @@ void PianoRoll::mouseMoveEvent( QMouseEvent * me )
 					// delete this note
 					it = m_midiClip->removeNote(it);
 					Engine::getSong()->setModified();
+					
+					// Invalidate note cache after removing note
+					m_notesCacheDirty = true;
 				}
 				else
 				{
@@ -4468,6 +4503,9 @@ void PianoRoll::finishRecordNote(const Note & n )
 					m_midiClip->addNote(n1, false);
 					update();
 					m_recordingNotes.erase( it );
+					
+					// Invalidate note cache after adding note
+					m_notesCacheDirty = true;
 					break;
 				}
 			}
@@ -4573,21 +4611,38 @@ void PianoRoll::selectAll()
 
 
 // returns vector with pointers to all selected notes
+// Note: This method is only called from the UI thread (Qt single-threaded UI model)
 NoteVector PianoRoll::getSelectedNotes() const
 {
-	NoteVector selectedNotes;
-
-	if (hasValidMidiClip())
+	if (m_notesCacheDirty)
 	{
-		for( Note *note : m_midiClip->notes() )
+		updateNotesCache();
+	}
+	
+	NoteVector selectedNotes;
+	for (Note* note : m_cachedNotes)
+	{
+		if (note->selected())
 		{
-			if( note->selected() )
-			{
-				selectedNotes.push_back( note );
-			}
+			selectedNotes.push_back(note);
 		}
 	}
 	return selectedNotes;
+}
+
+void PianoRoll::updateNotesCache() const
+{
+	if (!hasValidMidiClip())
+	{
+		m_cachedNotes.clear();
+		m_notesCacheDirty = false;
+		return;
+	}
+	
+	// Intentionally copy the notes vector to create a stable cache snapshot.
+	// This prevents issues if the original notes vector is modified while iterating.
+	m_cachedNotes = m_midiClip->notes();
+	m_notesCacheDirty = false;
 }
 
 // selects all notess associated with m_lastKey
@@ -4726,6 +4781,9 @@ void PianoRoll::cutSelectedNotes()
 			// MidiClip::removeNote(...) so we don't have to do that
 			m_midiClip->removeNote( note );
 		}
+		
+		// Invalidate note cache after removing notes
+		m_notesCacheDirty = true;
 	}
 
 	update();
@@ -4775,6 +4833,9 @@ void PianoRoll::pasteNotes()
 			m_midiClip->addNote( cur_note, false );
 		}
 
+		// Invalidate note cache after adding notes
+		m_notesCacheDirty = true;
+
 		// we only have to do the following lines if we pasted at
 		// least one note...
 		Engine::getSong()->setModified();
@@ -4797,6 +4858,9 @@ bool PianoRoll::deleteSelectedNotes()
 	m_midiClip->addJournalCheckPoint();
 
 	for (Note* note: selectedNotes) { m_midiClip->removeNote( note ); }
+
+	// Invalidate note cache after removing notes
+	m_notesCacheDirty = true;
 
 	Engine::getSong()->setModified();
 	update();
@@ -4906,27 +4970,56 @@ void PianoRoll::updatePositionStepRecording( const TimePos & t )
 
 void PianoRoll::zoomingChanged()
 {
-	m_ppb = m_zoomLevels[m_zoomingModel.value()] * DEFAULT_PR_PPB;
+	m_pendingZoomX = m_zoomLevels[m_zoomingModel.value()] * DEFAULT_PR_PPB;
+	
+	if (!m_zoomXUpdateTimer->isActive())
+	{
+		m_zoomXUpdateTimer->start();
+	}
+}
 
+
+void PianoRoll::applyZoomXChange()
+{
+	setUpdatesEnabled(false);
+	
+	m_ppb = m_pendingZoomX;
+	
 	assert( m_ppb > 0 );
-
+	
 	m_timeLine->setPixelsPerBar( m_ppb );
 	m_stepRecorderWidget.setPixelsPerBar( m_ppb );
 	m_positionLine->zoomChange(m_zoomLevels[m_zoomingModel.value()]);
 	updatePositionLinePos();
-
+	
+	setUpdatesEnabled(true);
 	update();
 }
 
 
 void PianoRoll::zoomingYChanged()
 {
-	m_keyLineHeight = m_zoomYLevels[m_zoomingYModel.value()] * DEFAULT_KEY_LINE_HEIGHT;
+	m_pendingZoomY = m_zoomingYModel.value();
+	
+	if (!m_zoomYUpdateTimer->isActive())
+	{
+		m_zoomYUpdateTimer->start();
+	}
+}
+
+
+void PianoRoll::applyZoomYChange()
+{
+	setUpdatesEnabled(false);
+	
+	m_keyLineHeight = m_zoomYLevels[m_pendingZoomY] * DEFAULT_KEY_LINE_HEIGHT;
 	m_whiteKeySmallHeight = qFloor(m_keyLineHeight * 1.5);
 	m_whiteKeyBigHeight = m_keyLineHeight * 2;
 	m_blackKeyHeight = m_keyLineHeight; //round(m_keyLineHeight * 1.3333);
 
 	updateYScroll();
+	
+	setUpdatesEnabled(true);
 	update();
 }
 
@@ -5003,6 +5096,9 @@ void PianoRoll::quantizeNotes(QuantizeAction mode)
 		}
 		m_midiClip->addNote(copy, false);
 	}
+	
+	// Invalidate note cache after modifying notes
+	m_notesCacheDirty = true;
 
 	update();
 	getGUI()->songEditor()->update();
