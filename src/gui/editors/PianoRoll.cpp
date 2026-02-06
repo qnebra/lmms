@@ -3603,7 +3603,7 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 			for (int beatIndex = 0; beatIndex < numerator; ++beatIndex)
 			{
 				// Use floating point division to avoid truncation errors
-				const tick_t beatTick = barTick + qRound(beatIndex * ticksPerBeat);
+				const tick_t beatTick = barTick + qRound64(beatIndex * ticksPerBeat);
 				const int x = xCoordOfTick(beatTick);
 				
 				if (x >= m_whiteKeyWidth && x <= width())
