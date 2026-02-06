@@ -340,6 +340,9 @@ void VstPlugin::saveSettings( QDomDocument & _doc, QDomElement & _this )
 
 void VstPlugin::toggleUI()
 {
+	// Ensure plugin is initialized before toggling UI
+	ensureInitialized();
+	
 	if ( m_embedMethod == "none" )
 	{
 		RemotePlugin::toggleUI();
@@ -532,6 +535,7 @@ QWidget *VstPlugin::editor()
 
 void VstPlugin::openPreset()
 {
+	ensureInitialized();
 	gui::FileDialog ofd(nullptr, tr("Open Preset"), "", tr("VST Plugin Preset (*.fxp *.fxb)"));
 	ofd.setFileMode(gui::FileDialog::ExistingFiles);
 	if (ofd.exec() == QDialog::Accepted && !ofd.selectedFiles().isEmpty())
@@ -549,6 +553,7 @@ void VstPlugin::openPreset()
 
 void VstPlugin::setProgram( int index )
 {
+	ensureInitialized();
 	lock();
 	sendMessage( message( IdVstSetProgram ).addInt( index ) );
 	waitForMessage( IdVstSetProgram, true );
@@ -560,6 +565,7 @@ void VstPlugin::setProgram( int index )
 
 void VstPlugin::rotateProgram( int offset )
 {
+	ensureInitialized();
 	lock();
 	sendMessage( message( IdVstRotateProgram ).addInt( offset ) );
 	waitForMessage( IdVstRotateProgram, true );
@@ -642,6 +648,7 @@ void VstPlugin::savePreset()
 
 void VstPlugin::setParam( int i, float f )
 {
+	ensureInitialized();
 	lock();
 	sendMessage( message( IdVstSetParameter ).addInt( i ).addFloat( f ) );
 	//waitForMessage( IdVstSetParameter, true );
@@ -659,6 +666,9 @@ void VstPlugin::idleUpdate()
 
 void VstPlugin::showUI()
 {
+	// Ensure plugin is initialized before showing UI
+	ensureInitialized();
+	
 	if ( m_embedMethod == "none" )
 	{
 		RemotePlugin::showUI();
@@ -674,9 +684,14 @@ void VstPlugin::showUI()
 
 void VstPlugin::hideUI()
 {
+	// No need to initialize just to hide UI
 	if ( m_embedMethod == "none" )
 	{
-		RemotePlugin::hideUI();
+		// Only call RemotePlugin::hideUI() if already initialized
+		if (m_lazyInitialized && !failed())
+		{
+			RemotePlugin::hideUI();
+		}
 	}
 	else if ( pluginWidget() != nullptr )
 	{
