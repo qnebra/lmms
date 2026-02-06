@@ -257,12 +257,18 @@ void TrackContainerView::scrollToTrackView( TrackView * _tv )
 
 void TrackContainerView::realignTracks()
 {
+	// Block updates during batch operation to prevent redundant redraws
+	setUpdatesEnabled(false);
+	
 	for (const auto& trackView : m_trackViews)
 	{
 		trackView->show();
 		trackView->update();
 	}
-
+	
+	// Re-enable updates and trigger single consolidated repaint
+	setUpdatesEnabled(true);
+	
 	emit tracksRealigned();
 }
 
@@ -341,11 +347,17 @@ void TrackContainerView::setPixelsPerBar( int ppb )
 {
 	m_ppb = ppb;
 
+	// Block updates during batch background updates
+	setUpdatesEnabled(false);
+	
 	// tell all TrackContentWidgets to update their background tile pixmap
 	for (const auto& trackView : m_trackViews)
 	{
 		trackView->getTrackContentWidget()->updateBackground();
 	}
+	
+	// Re-enable and trigger single update
+	setUpdatesEnabled(true);
 }
 
 
