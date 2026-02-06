@@ -3587,7 +3587,7 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 		}
 
 		// draw vertical beat lines
-		const tick_t ticksPerBeat = actualTicksPerBar / timeSig.numerator();
+		const tick_t ticksPerBeat = actualTicksPerBar / std::max(1, timeSig.numerator());
 		p.setPen(m_beatLineColor);
 		for(tick = m_currentPosition - m_currentPosition % ticksPerBeat,
 			x = xCoordOfTick( tick );
