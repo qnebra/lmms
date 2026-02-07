@@ -119,7 +119,7 @@ const int NUM_EVEN_LENGTHS = 6;
 const int NUM_TRIPLET_LENGTHS = 5;
 
 // Performance optimization: zoom debounce interval in milliseconds (~60fps)
-const int ZOOM_DEBOUNCE_INTERVAL_MS = 16;
+constexpr int ZOOM_DEBOUNCE_INTERVAL_MS = 16;
 
 // Radius of the automation node circles which appear when pitchbending a note
 const int DETUNING_HANDLE_RADIUS = 3;
@@ -152,6 +152,24 @@ const std::vector<float> PianoRoll::m_zoomLevels =
 
 const std::vector<float> PianoRoll::m_zoomYLevels =
 		{0.25f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f, 4.0f};
+
+
+namespace {
+	// RAII guard for QWidget::setUpdatesEnabled
+	class UpdatesEnabledGuard {
+	public:
+		explicit UpdatesEnabledGuard(QWidget* widget) : m_widget(widget) {
+			m_widget->setUpdatesEnabled(false);
+		}
+		~UpdatesEnabledGuard() {
+			m_widget->setUpdatesEnabled(true);
+		}
+		UpdatesEnabledGuard(const UpdatesEnabledGuard&) = delete;
+		UpdatesEnabledGuard& operator=(const UpdatesEnabledGuard&) = delete;
+	private:
+		QWidget* m_widget;
+	};
+}
 
 
 PianoRoll::PianoRoll() :
@@ -4611,7 +4629,8 @@ void PianoRoll::selectAll()
 
 
 // returns vector with pointers to all selected notes
-// Note: This method is only called from the UI thread (Qt single-threaded UI model)
+// Note: Currently only called from the UI thread. The mutable cache members are safe
+// because Qt's UI model is single-threaded and this method is not invoked concurrently.
 NoteVector PianoRoll::getSelectedNotes() const
 {
 	if (m_notesCacheDirty)
@@ -4972,16 +4991,15 @@ void PianoRoll::zoomingChanged()
 {
 	m_pendingZoomX = m_zoomLevels[m_zoomingModel.value()] * DEFAULT_PR_PPB;
 	
-	if (!m_zoomXUpdateTimer->isActive())
-	{
-		m_zoomXUpdateTimer->start();
-	}
+	// Restart the timer on every change to debounce zoom updates:
+	// applyZoomXChange() will be called only after the user stops changing zoom.
+	m_zoomXUpdateTimer->start();
 }
 
 
 void PianoRoll::applyZoomXChange()
 {
-	setUpdatesEnabled(false);
+	UpdatesEnabledGuard guard(this);
 	
 	m_ppb = m_pendingZoomX;
 	
@@ -4992,7 +5010,6 @@ void PianoRoll::applyZoomXChange()
 	m_positionLine->zoomChange(m_zoomLevels[m_zoomingModel.value()]);
 	updatePositionLinePos();
 	
-	setUpdatesEnabled(true);
 	update();
 }
 
@@ -5001,16 +5018,15 @@ void PianoRoll::zoomingYChanged()
 {
 	m_pendingZoomY = m_zoomingYModel.value();
 	
-	if (!m_zoomYUpdateTimer->isActive())
-	{
-		m_zoomYUpdateTimer->start();
-	}
+	// Restart the timer on every change to debounce zoom updates:
+	// applyZoomYChange() will be called only after the user stops changing zoom.
+	m_zoomYUpdateTimer->start();
 }
 
 
 void PianoRoll::applyZoomYChange()
 {
-	setUpdatesEnabled(false);
+	UpdatesEnabledGuard guard(this);
 	
 	m_keyLineHeight = m_zoomYLevels[m_pendingZoomY] * DEFAULT_KEY_LINE_HEIGHT;
 	m_whiteKeySmallHeight = qFloor(m_keyLineHeight * 1.5);
@@ -5019,7 +5035,6 @@ void PianoRoll::applyZoomYChange()
 
 	updateYScroll();
 	
-	setUpdatesEnabled(true);
 	update();
 }
 
