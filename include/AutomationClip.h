@@ -213,6 +213,9 @@ private:
 	void cleanObjects();
 	void generateTangents();
 	void generateTangents(timeMap::iterator it, int numToGenerate);
+	// Unlocked variants - caller must hold m_clipMutex
+	void generateTangents_unlocked();
+	void generateTangents_unlocked(timeMap::iterator it, int numToGenerate);
 	float valueAt( timeMap::const_iterator v, int offset ) const;
 
 	/**
