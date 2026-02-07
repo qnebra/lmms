@@ -255,35 +255,6 @@ void TrackContainerView::scrollToTrackView( TrackView * _tv )
 
 
 
-void TrackContainerView::performBatchUpdate(const std::function<void()>& updateFunction)
-{
-	// Save current update state
-	bool wasUpdatesEnabled = updatesEnabled();
-	QWidget* scrollContent = m_scrollArea->widget();
-	bool scrollWasUpdatesEnabled = scrollContent ? scrollContent->updatesEnabled() : true;
-	
-	// Block updates
-	setUpdatesEnabled(false);
-	if (scrollContent)
-	{
-		scrollContent->setUpdatesEnabled(false);
-	}
-
-	// Execute the batch update
-	updateFunction();
-
-	// Re-fetch scroll content in case updateFunction modified the widget tree
-	scrollContent = m_scrollArea->widget();
-	
-	// Restore previous update state
-	if (scrollContent)
-	{
-		scrollContent->setUpdatesEnabled(scrollWasUpdatesEnabled);
-	}
-	setUpdatesEnabled(wasUpdatesEnabled);
-}
-
-
 void TrackContainerView::realignTracks()
 {
 	performBatchUpdate([this]() {

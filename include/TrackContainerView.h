@@ -26,6 +26,7 @@
 #define LMMS_GUI_TRACK_CONTAINER_VIEW_H
 
 #include <functional>
+#include <utility>
 #include <QVector>
 #include <QScrollArea>
 #include <QWidget>
@@ -171,7 +172,8 @@ protected:
 
 	TimePos m_currentPosition;
 
-	void performBatchUpdate(const std::function<void()>& updateFunction);
+	template <class F>
+	void performBatchUpdate( F&& updateFunction );
 
 
 private:
@@ -207,6 +209,36 @@ signals:
 
 
 } ;
+
+
+template <class F>
+void TrackContainerView::performBatchUpdate( F&& updateFunction )
+{
+	// Save current update state
+	bool wasUpdatesEnabled = updatesEnabled();
+	QWidget* scrollContent = m_scrollArea->widget();
+	bool scrollWasUpdatesEnabled = scrollContent ? scrollContent->updatesEnabled() : true;
+	
+	// Block updates
+	setUpdatesEnabled( false );
+	if ( scrollContent )
+	{
+		scrollContent->setUpdatesEnabled( false );
+	}
+
+	// Execute the batch update
+	std::invoke( std::forward<F>( updateFunction ) );
+
+	// Re-fetch scroll content in case updateFunction modified the widget tree
+	scrollContent = m_scrollArea->widget();
+	
+	// Restore previous update state
+	if ( scrollContent )
+	{
+		scrollContent->setUpdatesEnabled( scrollWasUpdatesEnabled );
+	}
+	setUpdatesEnabled( wasUpdatesEnabled );
+}
 
 
 } // namespace gui
