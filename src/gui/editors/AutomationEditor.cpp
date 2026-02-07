@@ -34,6 +34,7 @@
 #include <QPushButton>
 #include <QScrollBar>
 #include <QStyleOption>
+#include <QTimer>
 #include <QToolTip>
 #include <cmath>
 
@@ -143,6 +144,17 @@ AutomationEditor::AutomationEditor() :
 	m_topBottomScroll->setPageStep( 20 );
 	connect( m_topBottomScroll, SIGNAL(valueChanged(int)), this,
 						SLOT(verScrolled(int)));
+
+	// Initialize zoom debouncing
+	m_zoomXUpdateTimer = new QTimer(this);
+	m_zoomXUpdateTimer->setSingleShot(true);
+	m_zoomXUpdateTimer->setInterval(16); // ~60fps
+	connect(m_zoomXUpdateTimer, &QTimer::timeout, this, &AutomationEditor::applyZoomXChange);
+
+	m_zoomYUpdateTimer = new QTimer(this);
+	m_zoomYUpdateTimer->setSingleShot(true);
+	m_zoomYUpdateTimer->setInterval(16); // ~60fps
+	connect(m_zoomYUpdateTimer, &QTimer::timeout, this, &AutomationEditor::applyZoomYChange);
 
 	setCurrentClip(nullptr);
 
@@ -1809,12 +1821,10 @@ void AutomationEditor::updatePosition()
 
 void AutomationEditor::zoomingXChanged()
 {
-	m_ppb = m_zoomXLevels[m_zoomingXModel.value()] * DEFAULT_PPB;
-
-	assert( m_ppb > 0 );
-
-	m_timeLine->setPixelsPerBar( m_ppb );
-	update();
+	m_pendingZoomX = m_zoomXLevels[m_zoomingXModel.value()] * DEFAULT_PPB;
+	
+	// Restart timer to implement true debouncing (apply after input settles)
+	m_zoomXUpdateTimer->start();
 }
 
 
@@ -1822,6 +1832,34 @@ void AutomationEditor::zoomingXChanged()
 
 void AutomationEditor::zoomingYChanged()
 {
+	// Restart timer to implement true debouncing (apply after input settles)
+	m_zoomYUpdateTimer->start();
+}
+
+
+
+
+void AutomationEditor::applyZoomXChange()
+{
+	setUpdatesEnabled(false);
+	
+	m_ppb = m_pendingZoomX;
+	
+	assert( m_ppb > 0 );
+	
+	m_timeLine->setPixelsPerBar( m_ppb );
+	
+	setUpdatesEnabled(true);
+	update();
+}
+
+
+
+
+void AutomationEditor::applyZoomYChange()
+{
+	setUpdatesEnabled(false);
+	
 	const QString & zfac = m_zoomingYModel.currentText();
 	m_y_auto = zfac == "Auto";
 	if( !m_y_auto )
@@ -1833,6 +1871,9 @@ void AutomationEditor::zoomingYChanged()
 	assert( m_y_delta > 0 );
 #endif
 	resizeEvent(nullptr);
+	
+	setUpdatesEnabled(true);
+	update();
 }
 
 

@@ -52,7 +52,13 @@ TimeLineWidget::TimeLineWidget(const int xoff, const int yoff, const float ppb, 
 	m_xOffset{xoff},
 	m_ppb{ppb},
 	m_timeline{&timeline},
-	m_begin{begin}
+	m_begin{begin},
+	m_cachedPPB{ppb},
+	m_cachedWidth{0},
+	m_cachedXOffset{xoff},
+	m_cachedBegin{begin},
+	m_cachedTicksPerBar{TimePos::ticksPerBar()},
+	m_backgroundDirty{true}
 {
 	move( 0, yoff );
 
@@ -60,6 +66,10 @@ TimeLineWidget::TimeLineWidget(const int xoff, const int yoff, const float ppb, 
 
 	connect( Engine::getSong(), SIGNAL(timeSignatureChanged(int,int)),
 					this, SLOT(update()));
+	// Invalidate cache on time signature change
+	connect( Engine::getSong(), &Song::timeSignatureChanged, this, [this]() {
+		m_backgroundDirty = true;
+	});
 	connect(m_timeline, &Timeline::positionChanged, this, qOverload<>(&QWidget::update));
 }
 
@@ -76,6 +86,8 @@ TimeLineWidget::~TimeLineWidget()
 void TimeLineWidget::setXOffset(const int x)
 {
 	m_xOffset = x;
+	m_backgroundDirty = true;
+	update();
 }
 
 void TimeLineWidget::addToolButtons( QToolBar * _tool_bar )
@@ -130,14 +142,78 @@ void TimeLineWidget::toggleAutoScroll( int _n )
 	m_autoScroll = static_cast<AutoScrollState>( _n );
 }
 
+void TimeLineWidget::renderBackground()
+{
+	// Create cached background pixmap
+	m_cachedBackground = QPixmap(width(), height());
+	m_cachedBackground.fill(palette().color(QPalette::Window));
+	
+	QPainter p(&m_cachedBackground);
+	
+	// Clip to drawing area
+	p.setClipRect(m_xOffset, 0, width() - m_xOffset, height());
+	
+	// Draw bar lines and numbers (existing logic from paintEvent)
+	QFont font = p.font();
+	font.setHintingPreference(QFont::PreferFullHinting);
+	p.setFont(font);
+	
+	int const fontAscent = p.fontMetrics().ascent();
+	int const fontHeight = p.fontMetrics().height();
+	
+	QColor const& barLineColor = getBarLineColor();
+	QColor const& barNumberColor = getBarNumberColor();
+	
+	bar_t barNumber = m_begin.getBar();
+	int const x = m_xOffset - ((static_cast<int>(m_begin * m_ppb) / TimePos::ticksPerBar()) % static_cast<int>(m_ppb));
+	
+	// Double the interval between bar numbers until they are far enough apart
+	int barLabelInterval = 1;
+	while (barLabelInterval * m_ppb < MIN_BAR_LABEL_DISTANCE) { barLabelInterval *= 2; }
+	
+	for(int i = 0; x + i * m_ppb < width(); ++i)
+	{
+		++barNumber;
+		if ((barNumber - 1) % barLabelInterval == 0)
+		{
+			const int cx = x + qRound(i * m_ppb);
+			p.setPen(barLineColor);
+			p.drawLine(cx, 5, cx, height() - 6);
+			
+			const QString s = QString::number(barNumber);
+			p.setPen(barNumberColor);
+			p.drawText(cx + 5, ((height() - fontHeight) / 2) + fontAscent, s);
+		}
+	}
+	
+	m_cachedPPB = m_ppb;
+	m_cachedWidth = width();
+	m_cachedXOffset = m_xOffset;
+	m_cachedBegin = m_begin;
+	m_cachedTicksPerBar = TimePos::ticksPerBar();
+	m_backgroundDirty = false;
+}
+
 void TimeLineWidget::paintEvent( QPaintEvent * )
 {
-	QPainter p( this );
-
-	// Draw background
-	p.fillRect( 0, 0, width(), height(), p.background() );
-
-	// Clip so that we only draw everything starting from the offset
+	QPainter p(this);
+	
+	// Check if we need to re-render background
+	// Use fuzzy comparison for float ppb and check all cache dependencies
+	bool ppbChanged = !qFuzzyCompare(m_ppb + 1.0f, m_cachedPPB + 1.0f);
+	bool geometryChanged = (width() != m_cachedWidth) || (m_xOffset != m_cachedXOffset);
+	bool scrollChanged = (m_begin != m_cachedBegin);
+	bool timeSignatureChanged = (TimePos::ticksPerBar() != m_cachedTicksPerBar);
+	
+	if (m_backgroundDirty || ppbChanged || geometryChanged || scrollChanged || timeSignatureChanged)
+	{
+		renderBackground();
+	}
+	
+	// Draw cached background
+	p.drawPixmap(0, 0, m_cachedBackground);
+	
+	// Re-clip for dynamic elements
 	p.setClipRect(m_xOffset, 0, width() - m_xOffset, height());
 
 	// Variables for the loop rectangle
@@ -151,40 +227,16 @@ void TimeLineWidget::paintEvent( QPaintEvent * )
 
 	// Draw the main loop rectangle (inner fill only)
 	QRect outerRectangle( loopStart, loopRectMargin, loopRectWidth - 1, loopRectHeight - 1 );
-	p.fillRect( outerRectangle, loopPointsActive ? getActiveLoopBrush() : getInactiveLoopBrush());
-
-	// Draw the bar lines and numbers
-	// Activate hinting on the font
-	QFont font = p.font();
-	font.setHintingPreference( QFont::PreferFullHinting );
-	p.setFont(font);
-	int const fontAscent = p.fontMetrics().ascent();
-	int const fontHeight = p.fontMetrics().height();
-
-	QColor const & barLineColor = getBarLineColor();
-	QColor const & barNumberColor = getBarNumberColor();
-
-	bar_t barNumber = m_begin.getBar();
-	int const x = m_xOffset - ((static_cast<int>(m_begin * m_ppb) / TimePos::ticksPerBar()) % static_cast<int>(m_ppb));
-
-	// Double the interval between bar numbers until they are far enough apart
-	int barLabelInterval = 1;
-	while (barLabelInterval * m_ppb < MIN_BAR_LABEL_DISTANCE) { barLabelInterval *= 2; }
-
-	for( int i = 0; x + i * m_ppb < width(); ++i )
+	
+	// Ensure brush is semi-transparent so bar lines from cached background remain visible
+	QBrush loopBrush = loopPointsActive ? getActiveLoopBrush() : getInactiveLoopBrush();
+	QColor brushColor = loopBrush.color();
+	if (brushColor.alpha() == 255)
 	{
-		++barNumber;
-		if ((barNumber - 1) % barLabelInterval == 0)
-		{
-			const int cx = x + qRound( i * m_ppb );
-			p.setPen( barLineColor );
-			p.drawLine( cx, 5, cx, height() - 6 );
-
-			const QString s = QString::number( barNumber );
-			p.setPen( barNumberColor );
-			p.drawText( cx + 5, ((height() - fontHeight) / 2) + fontAscent, s );
-		}
+		brushColor.setAlpha(128);
+		loopBrush.setColor(brushColor);
 	}
+	p.fillRect( outerRectangle, loopBrush);
 
 	// Draw the loop rectangle's outer outline
 	p.setPen( loopPointsActive ? getActiveLoopColor() : getInactiveLoopColor() );
@@ -405,6 +457,12 @@ void TimeLineWidget::mouseReleaseEvent( QMouseEvent* event )
 	m_hint = nullptr;
 	if ( m_action == Action::SelectSongClip ) { emit selectionFinished(); }
 	m_action = Action::NoAction;
+}
+
+void TimeLineWidget::resizeEvent( QResizeEvent* event )
+{
+	m_backgroundDirty = true;
+	QWidget::resizeEvent(event);
 }
 
 void TimeLineWidget::contextMenuEvent(QContextMenuEvent* event)

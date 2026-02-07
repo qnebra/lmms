@@ -85,10 +85,20 @@ public:
 	~TimeLineWidget() override;
 
 	inline QColor const & getBarLineColor() const { return m_barLineColor; }
-	inline void setBarLineColor(QColor const & barLineColor) { m_barLineColor = barLineColor; }
+	inline void setBarLineColor(QColor const & barLineColor) 
+	{ 
+		m_barLineColor = barLineColor; 
+		m_backgroundDirty = true;
+		update();
+	}
 
 	inline QColor const & getBarNumberColor() const { return m_barNumberColor; }
-	inline void setBarNumberColor(QColor const & barNumberColor) { m_barNumberColor = barNumberColor; }
+	inline void setBarNumberColor(QColor const & barNumberColor) 
+	{ 
+		m_barNumberColor = barNumberColor; 
+		m_backgroundDirty = true;
+		update();
+	}
 
 	inline QColor const & getInactiveLoopColor() const { return m_inactiveLoopColor; }
 	inline void setInactiveLoopColor(QColor const & inactiveLoopColor) { m_inactiveLoopColor = inactiveLoopColor; }
@@ -140,6 +150,7 @@ public:
 	inline void setPixelsPerBar( float ppb )
 	{
 		m_ppb = ppb;
+		m_backgroundDirty = true;
 		update();
 	}
 
@@ -180,6 +191,7 @@ protected:
 	void mousePressEvent( QMouseEvent * _me ) override;
 	void mouseMoveEvent( QMouseEvent * _me ) override;
 	void mouseReleaseEvent( QMouseEvent * _me ) override;
+	void resizeEvent( QResizeEvent * _re ) override;
 	void contextMenuEvent(QContextMenuEvent* event) override;
 
 private:
@@ -241,6 +253,17 @@ private:
 	int m_initalXSelect;
 
 	Action m_action = Action::NoAction;
+
+	// Background caching
+	QPixmap m_cachedBackground;
+	float m_cachedPPB;
+	int m_cachedWidth;
+	int m_cachedXOffset;
+	TimePos m_cachedBegin;
+	int m_cachedTicksPerBar;
+	bool m_backgroundDirty;
+
+	void renderBackground();
 };
 
 } // namespace lmms::gui

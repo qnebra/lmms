@@ -40,6 +40,7 @@
 
 class QPushButton;
 class QScrollBar;
+class QTimer;
 
 namespace lmms
 {
@@ -172,6 +173,9 @@ protected slots:
 		update();
 	}
 
+	void applyZoomXChange();
+	void applyZoomYChange();
+
 private:
 
 	enum class Action
@@ -292,6 +296,11 @@ private:
 	QColor m_outOfBoundsShade;
 	
 	SampleThumbnail m_sampleThumbnail;
+
+	// Zoom debouncing
+	QTimer* m_zoomXUpdateTimer;
+	QTimer* m_zoomYUpdateTimer;
+	int m_pendingZoomX;
 
 	friend class AutomationEditorWindow;
 
