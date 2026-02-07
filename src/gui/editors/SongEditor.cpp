@@ -24,6 +24,7 @@
 
 #include "SongEditor.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include <QAction>
@@ -32,6 +33,7 @@
 #include <QMdiArea>
 #include <QScrollBar>
 #include <QSlider>
+#include <QTimer>
 #include <QTimeLine>
 
 #include "ActionGroup.h"
@@ -92,7 +94,12 @@ SongEditor::SongEditor( Song * song ) :
 	m_trackHeadWidth(ConfigManager::inst()->value("ui", "compacttrackbuttons").toInt()==1
 					 ? DEFAULT_SETTINGS_WIDGET_WIDTH_COMPACT + TRACK_OP_WIDTH_COMPACT
 					 : DEFAULT_SETTINGS_WIDGET_WIDTH + TRACK_OP_WIDTH),
-	m_selectRegion(false)
+	m_selectRegion(false),
+	m_zoomUpdateTimer(nullptr),
+	m_pendingPixelsPerBar(DEFAULT_PIXELS_PER_BAR),
+	m_wheelZoomOriginTick(0),
+	m_selectableObjectsCacheDirty(true),
+	m_positionLineUpdatePending(false)
 {
 	// Set up timeline
 	m_timeLine = new TimeLineWidget(m_trackHeadWidth, 32, pixelsPerBar(),
@@ -107,7 +114,34 @@ SongEditor::SongEditor( Song * song ) :
 			 this, SLOT(stopRubberBand()));
 
 	// when tracks realign, adjust height of position line
-	connect(this, &TrackContainerView::tracksRealigned, this, &SongEditor::updatePositionLine);
+	connect(this, &TrackContainerView::tracksRealigned, this, &SongEditor::schedulePositionLineUpdate);
+
+	// Initialize zoom debounce timer
+	m_zoomUpdateTimer = new QTimer(this);
+	m_zoomUpdateTimer->setSingleShot(true);
+	m_zoomUpdateTimer->setInterval(16); // ~60fps
+	connect(m_zoomUpdateTimer, &QTimer::timeout, this, &SongEditor::applyZoomChange);
+
+	// Mark cache dirty when tracks realign
+	connect(this, &TrackContainerView::tracksRealigned, this, [this]() {
+		m_selectableObjectsCacheDirty = true;
+	});
+
+	// Mark cache dirty when tracks are added (so we can connect to their clip signals)
+	connect(trackContainer(), &TrackContainer::trackAdded, this, [this](Track* track) {
+		// Connect to clip add signal for this track
+		connect(track, &Track::clipAdded, this, [this]() {
+			m_selectableObjectsCacheDirty = true;
+		});
+		m_selectableObjectsCacheDirty = true;
+	});
+
+	// Connect to existing tracks' clip signals
+	for (auto* track : trackContainer()->tracks()) {
+		connect(track, &Track::clipAdded, this, [this]() {
+			m_selectableObjectsCacheDirty = true;
+		});
+	}
 
 	m_positionLine = new PositionLine(this, Song::PlayMode::Song);
 	static_cast<QVBoxLayout *>( layout() )->insertWidget( 1, m_timeLine );
@@ -120,7 +154,7 @@ SongEditor::SongEditor( Song * song ) :
 	connect(this, &SongEditor::pixelsPerBarChanged, m_positionLine,
 		[this]() {
 			m_positionLine->zoomChange(pixelsPerBar() / float(DEFAULT_PIXELS_PER_BAR));
-			updatePositionLine();
+			schedulePositionLineUpdate();
 		});
 
 	// Ensure loop markers snap to same increments as clips. Zoom & proportional
@@ -330,7 +364,7 @@ void SongEditor::scrolled( int new_pos )
 {
 	update();
 	emit positionChanged(m_currentPosition = TimePos(new_pos));
-	updatePositionLine();
+	schedulePositionLineUpdate();
 }
 
 
@@ -342,8 +376,11 @@ void SongEditor::selectRegionFromPixels(int xStart, int xEnd)
 	{
 		m_selectRegion = true;
 
-		//deselect all clips
-		for (auto &it : findChildren<selectableObject *>()) { it->setSelected(false); }
+		//deselect all clips using cache
+		updateSelectableObjectsCache();
+		for (const auto& it : m_cachedSelectableObjects) { 
+			if (it) it->setSelected(false);
+		}
 
 		rubberBand()->setEnabled(true);
 		rubberBand()->show();
@@ -409,18 +446,20 @@ void SongEditor::updateRubberband()
 											  + m_currentPosition;
 
 		//are clips in the rect of selection?
-		for (auto &it : findChildren<selectableObject *>())
+		// Update cache if needed
+		updateSelectableObjectsCache();
+
+		// Use cached clip views (avoids findChildren and dynamic_cast)
+		for (const auto& clip : m_cachedClipViews)
 		{
-			auto clip = dynamic_cast<ClipView*>(it);
-			if (clip)
-			{
-				auto indexOfTrackView = trackViews().indexOf(clip->getTrackView());
-				bool isBeetweenRubberbandViews = indexOfTrackView >= qMin(m_rubberBandStartTrackview, rubberBandTrackview)
-											  && indexOfTrackView <= qMax(m_rubberBandStartTrackview, rubberBandTrackview);
-				bool isBeetweenRubberbandTimePos = clip->getClip()->endPosition() >= qMin(m_rubberbandStartTimePos, rubberbandTimePos)
-											  && clip->getClip()->startPosition() <= qMax(m_rubberbandStartTimePos, rubberbandTimePos);
-				it->setSelected(isBeetweenRubberbandViews && isBeetweenRubberbandTimePos);
-			}
+			if (!clip) continue; // Skip if object was deleted
+			
+			auto indexOfTrackView = trackViews().indexOf(clip->getTrackView());
+			bool isBetweenRubberbandViews = indexOfTrackView >= qMin(m_rubberBandStartTrackview, rubberBandTrackview)
+										  && indexOfTrackView <= qMax(m_rubberBandStartTrackview, rubberBandTrackview);
+			bool isBetweenRubberbandTimePos = clip->getClip()->endPosition() >= qMin(m_rubberbandStartTimePos, rubberbandTimePos)
+										  && clip->getClip()->startPosition() <= qMax(m_rubberbandStartTimePos, rubberbandTimePos);
+			clip->setSelected(isBetweenRubberbandViews && isBetweenRubberbandTimePos);
 		}
 	}
 }
@@ -534,23 +573,31 @@ void SongEditor::wheelEvent( QWheelEvent * we )
 	if ((we->modifiers() & Qt::ControlModifier) && (posX > m_trackHeadWidth))
 	{
 		int x = posX - m_trackHeadWidth;
+		// Use current pixelsPerBar value for the tick calculation
+		const int ppb = pixelsPerBar();
+		const float ticksPerPixel = static_cast<float>(TimePos::ticksPerBar()) / ppb;
+		
 		// tick based on the mouse x-position where the scroll wheel was used
-		int tick = x / pixelsPerBar() * TimePos::ticksPerBar();
+		int tick = static_cast<int>(x * ticksPerPixel);
 
-		// move zoom slider (pixelsPerBar will change automatically)
+		// move zoom slider (this will trigger zoomingChanged which defers the actual zoom)
 		int step = we->modifiers() & Qt::ShiftModifier ? 1 : 5;
 		// when Alt is pressed, wheelEvent returns delta for x coordinate (mimics horizontal mouse wheel)
 		int direction = (we->angleDelta().y() + we->angleDelta().x()) > 0 ? 1 : -1;
 		m_zoomingModel->incValue(step * direction);
 
-		// scroll to zooming around cursor's tick
-		int newTick = static_cast<int>(x / pixelsPerBar() * TimePos::ticksPerBar());
-		m_leftRightScroll->setValue(m_leftRightScroll->value() + tick - newTick);
-
-		// update timeline
-		m_timeLine->setPixelsPerBar(pixelsPerBar());
-		// and make sure, all Clip's are resized and relocated
-		realignTracks();
+		// Calculate what the new zoom will be (after debounce timer fires)
+		// Use calculatePixelsPerBar() to get the pending value
+		const int newPpb = calculatePixelsPerBar();
+		const float newTicksPerPixel = static_cast<float>(TimePos::ticksPerBar()) / newPpb;
+		int newTick = static_cast<int>(x * newTicksPerPixel);
+		
+		// Store the scroll adjustment to be applied when zoom is actually applied
+		// This preserves cursor-anchored zooming
+		m_wheelZoomOriginTick = m_leftRightScroll->value() + tick - newTick;
+		
+		// Don't call realignTracks() or setPixelsPerBar here - let applyZoomChange() handle it
+		// This is the whole point of the debouncing optimization
 	}
 
 	// FIXME: Reconsider if determining orientation is necessary in Qt6.
@@ -792,7 +839,7 @@ void SongEditor::updatePosition()
 		m_scrollBack = false;
 	}
 
-	updatePositionLine();
+	schedulePositionLineUpdate();
 }
 
 
@@ -815,6 +862,21 @@ void SongEditor::updatePositionLine()
 	}
 
 	m_positionLine->setFixedHeight(totalHeightOfTracks());
+}
+
+
+void SongEditor::schedulePositionLineUpdate()
+{
+	if (m_positionLineUpdatePending)
+	{
+		return;
+	}
+	
+	m_positionLineUpdatePending = true;
+	QMetaObject::invokeMethod(this, [this]() {
+		m_positionLineUpdatePending = false;
+		updatePositionLine();
+	}, Qt::QueuedConnection);
 }
 
 
@@ -855,24 +917,105 @@ int SongEditor::calculateZoomSliderValue(int pixelsPerBar) const
 
 void SongEditor::zoomingChanged()
 {
-	int ppb = calculatePixelsPerBar();
-	setPixelsPerBar(ppb);
+	// Store pending zoom value and debounce with timer
+	m_pendingPixelsPerBar = calculatePixelsPerBar();
+	m_zoomUpdateTimer->start();
+}
 
-	m_timeLine->setPixelsPerBar(ppb);
+
+void SongEditor::applyZoomChange()
+{
+	// Early return if zoom hasn't actually changed
+	if (m_pendingPixelsPerBar == pixelsPerBar())
+	{
+		return;
+	}
+
+	// Block widget updates during bulk operations
+	setUpdatesEnabled(false);
+	contentWidget()->setUpdatesEnabled(false);
+
+	// Apply the zoom change
+	setPixelsPerBar(m_pendingPixelsPerBar);
+	m_timeLine->setPixelsPerBar(m_pendingPixelsPerBar);
 	realignTracks();
 	updateRubberband();
 	m_timeLine->setSnapSize(getSnapSize());
 
-	emit pixelsPerBarChanged(ppb);
+	// Apply cursor-anchored scroll adjustment from wheelEvent if set
+	if (m_wheelZoomOriginTick != 0)
+	{
+		m_leftRightScroll->setValue(m_wheelZoomOriginTick);
+		m_wheelZoomOriginTick = 0;
+	}
+
+	// Re-enable updates and force single repaint
+	contentWidget()->setUpdatesEnabled(true);
+	setUpdatesEnabled(true);
+
+	emit pixelsPerBarChanged(m_pendingPixelsPerBar);
+}
+
+
+void SongEditor::updateSelectableObjectsCache()
+{
+	if (!m_selectableObjectsCacheDirty)
+	{
+		// Even if not dirty, clean up null pointers that may have been deleted
+		m_cachedSelectableObjects.erase(
+			std::remove_if(m_cachedSelectableObjects.begin(), m_cachedSelectableObjects.end(),
+				[](const QPointer<selectableObject>& ptr) { return ptr.isNull(); }),
+			m_cachedSelectableObjects.end());
+		m_cachedClipViews.erase(
+			std::remove_if(m_cachedClipViews.begin(), m_cachedClipViews.end(),
+				[](const QPointer<ClipView>& ptr) { return ptr.isNull(); }),
+			m_cachedClipViews.end());
+		return;
+	}
+
+	// Clear existing cache
+	m_cachedSelectableObjects.clear();
+	m_cachedClipViews.clear();
+
+	// Build cache of selectable objects and clip views
+	// This eliminates need for dynamic_cast in loops
+	// Using QPointer for automatic null detection when objects are deleted
+	for (auto* obj : findChildren<selectableObject*>())
+	{
+		m_cachedSelectableObjects.append(QPointer<selectableObject>(obj));
+		
+		// Check if this is a ClipView (avoids dynamic_cast in hot path)
+		auto* clipView = qobject_cast<ClipView*>(obj);
+		if (clipView)
+		{
+			m_cachedClipViews.append(QPointer<ClipView>(clipView));
+		}
+	}
+
+	m_selectableObjectsCacheDirty = false;
 }
 
 
 void SongEditor::selectAllClips( bool select )
 {
-	QVector<selectableObject *> so = select ? rubberBand()->selectableObjects() : rubberBand()->selectedObjects();
-	for( int i = 0; i < so.count(); ++i )
+	// Update cache if needed
+	updateSelectableObjectsCache();
+
+	// Use cached list or selected objects
+	if (select)
 	{
-		so.at(i)->setSelected( select );
+		for (const auto& obj : m_cachedSelectableObjects)
+		{
+			if (obj) obj->setSelected(true);
+		}
+	}
+	else
+	{
+		QVector<selectableObject *> so = rubberBand()->selectedObjects();
+		for (int i = 0; i < so.count(); ++i)
+		{
+			so.at(i)->setSelected(false);
+		}
 	}
 }
 
