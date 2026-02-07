@@ -114,7 +114,8 @@ void SubWindow::setWidget( QWidget * widget )
 			this,
 			[this]( QObject * obj )
 			{
-				// Compare pointers directly; obj is the widget being destroyed
+				// obj is the destroyed widget; compare with our cached pointer
+				// (Both are QObject* since widget is being destroyed)
 				if( m_childWithFilter == obj )
 				{
 					m_childWithFilter = nullptr;
