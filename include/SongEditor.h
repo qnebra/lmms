@@ -29,6 +29,8 @@
 #include "Editor.h"
 #include "TrackContainerView.h"
 
+#include <QPointer>
+
 class QLabel;
 class QScrollBar;
 class QTimer;
@@ -175,8 +177,9 @@ private:
 	// Performance optimization members
 	QTimer* m_zoomUpdateTimer;
 	int m_pendingPixelsPerBar;
-	QVector<selectableObject*> m_cachedSelectableObjects;
-	QVector<ClipView*> m_cachedClipViews;
+	int m_wheelZoomOriginTick; // Cursor position for zoom-around-cursor in wheelEvent
+	QVector<QPointer<selectableObject>> m_cachedSelectableObjects;
+	QVector<QPointer<ClipView>> m_cachedClipViews;
 	bool m_selectableObjectsCacheDirty;
 	bool m_positionLineUpdatePending;
 
