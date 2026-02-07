@@ -107,6 +107,7 @@ private:
 	
 	// Performance optimization: cache child widget icon
 	QPixmap m_cachedWinIcon;
+	QSize m_cachedIconLogicalSize;
 	QWidget * m_childWithFilter;
 	
 	// Performance optimization: cache last title state to avoid redundant updates

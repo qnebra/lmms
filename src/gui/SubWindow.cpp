@@ -48,7 +48,7 @@ SubWindow::SubWindow(QWidget *parent, Qt::WindowFlags windowFlags) :
 	m_titleBarHeight(titleBarHeight()),
 	m_hasFocus(false),
 	m_childWithFilter(nullptr),
-	m_lastTitleWidth(-1)
+	m_lastTitleWidth(-1) // -1 forces initial title update
 {
 	// initialize the tracked geometry to whatever Qt thinks the normal geometry currently is.
 	// this should always work, since QMdiSubWindows will not start as maximized
@@ -114,8 +114,8 @@ void SubWindow::setWidget( QWidget * widget )
 			this,
 			[this]( QObject * obj )
 			{
-				// obj is the widget being destroyed; clear our pointer if it matches
-				if( m_childWithFilter == static_cast<QWidget*>(obj) )
+				// Compare pointers directly; obj is already being destroyed
+				if( static_cast<void*>(m_childWithFilter) == static_cast<void*>(obj) )
 				{
 					m_childWithFilter = nullptr;
 					m_cachedWinIcon = QPixmap(); // Clear cached icon
@@ -157,6 +157,7 @@ void SubWindow::updateCachedIcon()
 	if( widget() )
 	{
 		m_cachedWinIcon = widget()->windowIcon().pixmap( m_buttonSize );
+		m_cachedIconLogicalSize = m_cachedWinIcon.size() / m_cachedWinIcon.devicePixelRatio();
 	}
 }
 
@@ -204,8 +205,7 @@ void SubWindow::paintEvent( QPaintEvent * )
 			// Prefer drawing at native size to avoid per-paint scaling work.
 			// Fall back to scaled drawing only if the cached pixmap size does not
 			// match the intended button size (including HiDPI considerations).
-			QSize logicalSize = m_cachedWinIcon.size() / m_cachedWinIcon.devicePixelRatio();
-			if( logicalSize == m_buttonSize )
+			if( m_cachedIconLogicalSize == m_buttonSize )
 			{
 				p.drawPixmap( 3, 3, m_cachedWinIcon );
 			}
