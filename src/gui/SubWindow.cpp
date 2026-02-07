@@ -112,9 +112,10 @@ void SubWindow::setWidget( QWidget * widget )
 			widget,
 			&QObject::destroyed,
 			this,
-			[this, widget]( QObject * )
+			[this]( QObject * obj )
 			{
-				if( m_childWithFilter == widget )
+				// obj is the widget being destroyed; clear our pointer if it matches
+				if( m_childWithFilter == static_cast<QWidget*>(obj) )
 				{
 					m_childWithFilter = nullptr;
 					m_cachedWinIcon = QPixmap(); // Clear cached icon
@@ -203,7 +204,8 @@ void SubWindow::paintEvent( QPaintEvent * )
 			// Prefer drawing at native size to avoid per-paint scaling work.
 			// Fall back to scaled drawing only if the cached pixmap size does not
 			// match the intended button size (including HiDPI considerations).
-			if( m_cachedWinIcon.size() == m_buttonSize )
+			QSize logicalSize = m_cachedWinIcon.size() / m_cachedWinIcon.devicePixelRatio();
+			if( logicalSize == m_buttonSize )
 			{
 				p.drawPixmap( 3, 3, m_cachedWinIcon );
 			}
