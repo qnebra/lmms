@@ -48,7 +48,7 @@ SubWindow::SubWindow(QWidget *parent, Qt::WindowFlags windowFlags) :
 	m_titleBarHeight(titleBarHeight()),
 	m_hasFocus(false),
 	m_childWithFilter(nullptr),
-	m_lastTitleWidth(0)
+	m_lastTitleWidth(-1)
 {
 	// initialize the tracked geometry to whatever Qt thinks the normal geometry currently is.
 	// this should always work, since QMdiSubWindows will not start as maximized
@@ -106,6 +106,22 @@ void SubWindow::setWidget( QWidget * widget )
 	{
 		widget->installEventFilter( this );
 		m_childWithFilter = widget;
+		
+		// Ensure m_childWithFilter is cleared if the widget is destroyed elsewhere
+		QObject::connect(
+			widget,
+			&QObject::destroyed,
+			this,
+			[this, widget]( QObject * )
+			{
+				if( m_childWithFilter == widget )
+				{
+					m_childWithFilter = nullptr;
+					m_cachedWinIcon = QPixmap(); // Clear cached icon
+				}
+			}
+		);
+		
 		updateCachedIcon();
 	}
 }
@@ -184,7 +200,17 @@ void SubWindow::paintEvent( QPaintEvent * )
 		
 		if( !m_cachedWinIcon.isNull() )
 		{
-			p.drawPixmap( 3, 3, m_buttonSize.width(), m_buttonSize.height(), m_cachedWinIcon );
+			// Prefer drawing at native size to avoid per-paint scaling work.
+			// Fall back to scaled drawing only if the cached pixmap size does not
+			// match the intended button size (including HiDPI considerations).
+			if( m_cachedWinIcon.size() == m_buttonSize )
+			{
+				p.drawPixmap( 3, 3, m_cachedWinIcon );
+			}
+			else
+			{
+				p.drawPixmap( QRect( 3, 3, m_buttonSize.width(), m_buttonSize.height() ), m_cachedWinIcon );
+			}
 		}
 	}
 }
@@ -434,14 +460,16 @@ void SubWindow::adjustTitleBar()
 			m_lastTitleWidth = titleWidth;
 			
 			m_windowTitle->setFixedWidth( titleWidth );
-			m_windowTitle->move( menuButtonSpace,
-				( m_titleBarHeight / 2 ) - ( m_windowTitle->sizeHint().height() / 2 ) - 1 );
 			
 			// truncate the label string if the window is to small. Adds "..."
 			elideText( m_windowTitle, currentTitle );
-			m_windowTitle->setTextInteractionFlags( Qt::NoTextInteraction );
 			m_windowTitle->adjustSize();
 		}
+		
+		// Position and interaction flags should be updated even if title/width didn't change
+		m_windowTitle->move( menuButtonSpace,
+			( m_titleBarHeight / 2 ) - ( m_windowTitle->sizeHint().height() / 2 ) - 1 );
+		m_windowTitle->setTextInteractionFlags( Qt::NoTextInteraction );
 	}
 }
 
