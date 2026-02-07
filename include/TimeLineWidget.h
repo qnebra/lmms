@@ -256,8 +256,11 @@ private:
 
 	// Background caching
 	QPixmap m_cachedBackground;
-	int m_cachedPPB;
+	float m_cachedPPB;
 	int m_cachedWidth;
+	int m_cachedXOffset;
+	TimePos m_cachedBegin;
+	int m_cachedTicksPerBar;
 	bool m_backgroundDirty;
 
 	void renderBackground();
