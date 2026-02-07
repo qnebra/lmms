@@ -255,37 +255,21 @@ void TrackContainerView::scrollToTrackView( TrackView * _tv )
 
 
 
-void TrackContainerView::performBatchUpdate(std::function<void()> updateFunction)
-{
-	// Block updates
-	setUpdatesEnabled(false);
-	QWidget* scrollContent = m_scrollArea->widget();
-	if (scrollContent)
-	{
-		scrollContent->setUpdatesEnabled(false);
-	}
-
-	// Execute the batch update
-	updateFunction();
-
-	// Re-enable updates
-	if (scrollContent)
-	{
-		scrollContent->setUpdatesEnabled(true);
-	}
-	setUpdatesEnabled(true);
-}
-
-
 void TrackContainerView::realignTracks()
 {
 	performBatchUpdate([this]() {
 		for (const auto& trackView : m_trackViews)
 		{
 			trackView->show();
-			trackView->update();
 		}
 	});
+
+	// Trigger single consolidated repaint
+	QWidget* scrollContent = m_scrollArea->widget();
+	if (scrollContent)
+	{
+		scrollContent->update();
+	}
 
 	emit tracksRealigned();
 }
