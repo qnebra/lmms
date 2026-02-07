@@ -147,6 +147,12 @@ public slots:
 	virtual void hideUI();
 
 protected:
+	// Hook for lazy initialization - subclasses can override to defer
+	// expensive initialization until first use.
+	// Note: Must be thread-safe and avoid heavy work if called from audio thread.
+	virtual void ensureInitialized() {}
+
+protected:
 	inline void setSplittedChannels( bool _on )
 	{
 		m_splitChannels = _on;

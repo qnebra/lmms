@@ -25,7 +25,10 @@
 
 #include "VstEffect.h"
 
+#include <QFileInfo>
+
 #include "GuiApplication.h"
+#include "PathUtil.h"
 #include "Song.h"
 #include "TextFloat.h"
 #include "VstPlugin.h"
@@ -107,6 +110,17 @@ Effect::ProcessStatus VstEffect::processImpl(SampleFrame* buf, const fpp_t frame
 
 bool VstEffect::openPlugin(const QString& plugin)
 {
+	// Convert to absolute path for validation (same as VstPlugin constructor does)
+	QString absolutePath = PathUtil::toAbsolute(plugin);
+
+	// Basic validation: check if plugin file exists
+	QFileInfo fileInfo(absolutePath);
+	if (!fileInfo.exists())
+	{
+		collectErrorForUI(VstPlugin::tr("The VST plugin %1 could not be found.").arg(plugin));
+		return false;
+	}
+
 	gui::TextFloat* tf = nullptr;
 	if( gui::getGUI() != nullptr )
 	{
@@ -117,7 +131,13 @@ bool VstEffect::openPlugin(const QString& plugin)
 	}
 
 	QMutexLocker ml( &m_pluginMutex ); Q_UNUSED( ml );
+	// Create new VstPlugin instance with lazy initialization
 	m_plugin = QSharedPointer<VstPlugin>(new VstPlugin(plugin));
+
+	// Trigger initialization in non-RT context to detect issues early
+	// This provides immediate user feedback if the plugin cannot be loaded
+	m_plugin->ensureInitialized();
+
 	if( m_plugin->failed() )
 	{
 		m_plugin.clear();
