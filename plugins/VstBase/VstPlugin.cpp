@@ -33,6 +33,7 @@
 #include <QFileInfo>
 #include <QLocale>
 #include <QTemporaryFile>
+#include <QThread>
 
 #if defined(LMMS_BUILD_LINUX) && (QT_VERSION < QT_VERSION_CHECK(6,0,0))
 #	include <QX11Info>
@@ -116,11 +117,6 @@ private:
 namespace lmms
 {
 
-enum class ExecutableType
-{
-	Unknown, Win32, Win64, Linux64,
-};
-
 VstPlugin::VstPlugin( const QString & _plugin ) :
 	m_plugin( PathUtil::toAbsolute(_plugin) ),
 	m_pluginWindowID( 0 ),
@@ -128,13 +124,131 @@ VstPlugin::VstPlugin( const QString & _plugin ) :
 			? ConfigManager::inst()->vstEmbedMethod()
 			: "headless" ),
 	m_version( 0 ),
-	m_currentProgram()
+	m_currentProgram(),
+	m_initState( InitState::Uninitialized )
 {
 	setSplittedChannels( true );
 
+	// Defer plugin loading and process spawning to ensureInitialized()
+	// This allows fast construction and lazy loading on first use
+
+	// Note: Signal connections and timer setup moved to ensureInitialized()
+}
+
+
+
+
+VstPlugin::~VstPlugin()
+{
+	delete m_pluginWidget;
+}
+
+
+
+
+void VstPlugin::ensureInitialized()
+{
+	// Fast path: already initialized
+	InitState state = m_initState.load(std::memory_order_acquire);
+	if (state == InitState::Initialized)
+	{
+		return;
+	}
+	
+	// If failed previously, don't retry
+	if (state == InitState::Failed)
+	{
+		return;
+	}
+
+	// Slow path: need to initialize
+	QMutexLocker locker(&m_initMutex);
+	
+	// Double-check after acquiring lock
+	state = m_initState.load(std::memory_order_acquire);
+	if (state == InitState::Initialized || state == InitState::Failed)
+	{
+		return;
+	}
+	
+	// Check if another thread is already initializing
+	if (state == InitState::Initializing)
+	{
+		// Wait for the other thread to finish
+		// This is a simple busy-wait; a condition variable would be better
+		// but adds complexity. Given initialization is rare, this is acceptable.
+		locker.unlock();
+		while (m_initState.load(std::memory_order_acquire) == InitState::Initializing)
+		{
+			QThread::msleep(10);
+		}
+		return;
+	}
+
+	// Mark as initializing
+	m_initState.store(InitState::Initializing, std::memory_order_release);
+
+#ifdef DEBUG_VST
+	qDebug() << "VstPlugin: Lazy initialization for" << m_plugin;
+#endif
+
+	// Detect plugin type and load appropriate RemoteVstPlugin executable
+	auto pluginType = detectPluginType(m_plugin);
+
+	bool success = false;
+	switch(pluginType)
+	{
+	case ExecutableType::Win64:
+		tryLoad( REMOTE_VST_PLUGIN_FILEPATH_64 ); // Default: RemoteVstPlugin64
+		success = !failed();
+		break;
+	case ExecutableType::Win32:
+		tryLoad( REMOTE_VST_PLUGIN_FILEPATH_32 ); // Default: 32/RemoteVstPlugin32
+		success = !failed();
+		break;
+#ifdef LMMS_BUILD_LINUX
+	case ExecutableType::Linux64:
+		tryLoad( NATIVE_LINUX_REMOTE_VST_PLUGIN_FILEPATH_64 ); // Default: NativeLinuxRemoteVstPlugin64
+		success = !failed();
+		break;
+#endif
+	default:
+		m_failed = true;
+		success = false;
+		break;
+	}
+
+	if (!success)
+	{
+		m_initState.store(InitState::Failed, std::memory_order_release);
+		return;
+	}
+
+	// Setup signal connections and timer only after successful load
+	setTempo( Engine::getSong()->getTempo() );
+
+	connect( Engine::getSong(), SIGNAL( tempoChanged( lmms::bpm_t ) ),
+			this, SLOT( setTempo( lmms::bpm_t ) ), Qt::DirectConnection );
+	connect( Engine::audioEngine(), SIGNAL( sampleRateChanged() ),
+				this, SLOT( updateSampleRate() ) );
+
+	// update once per second
+	m_idleTimer.start( 1000 );
+	connect( &m_idleTimer, SIGNAL( timeout() ),
+				this, SLOT( idleUpdate() ) );
+
+	// Mark as successfully initialized
+	m_initState.store(InitState::Initialized, std::memory_order_release);
+}
+
+
+
+
+VstPlugin::ExecutableType VstPlugin::detectPluginType(const QString& pluginPath)
+{
 	auto pluginType = ExecutableType::Unknown;
 #ifdef LMMS_BUILD_LINUX
-	QFileInfo fi(m_plugin);
+	QFileInfo fi(pluginPath);
 	if (fi.suffix() == "so")
 	{
 		pluginType = ExecutableType::Linux64;
@@ -143,7 +257,7 @@ VstPlugin::VstPlugin( const QString & _plugin ) :
 #endif
 	{
 		try {
-			PE::FileInfo peInfo(m_plugin);
+			PE::FileInfo peInfo(pluginPath);
 			switch (peInfo.machineType())
 			{
 			case PE::MachineType::amd64:
@@ -158,47 +272,10 @@ VstPlugin::VstPlugin( const QString & _plugin ) :
 				break;
 			}
 		} catch (std::runtime_error& e) {
-			qCritical() << "Error while determining PE file's machine type: " << e.what();
+			qCritical() << "Error while determining PE file's machine type for" << pluginPath << ":" << e.what();
 		}
 	}
-
-	switch(pluginType)
-	{
-	case ExecutableType::Win64:
-		tryLoad( REMOTE_VST_PLUGIN_FILEPATH_64 ); // Default: RemoteVstPlugin64
-		break;
-	case ExecutableType::Win32:
-		tryLoad( REMOTE_VST_PLUGIN_FILEPATH_32 ); // Default: 32/RemoteVstPlugin32
-		break;
-#ifdef LMMS_BUILD_LINUX
-	case ExecutableType::Linux64:
-		tryLoad( NATIVE_LINUX_REMOTE_VST_PLUGIN_FILEPATH_64 ); // Default: NativeLinuxRemoteVstPlugin32
-		break;
-#endif
-	default:
-		m_failed = true;
-		return;
-	}
-
-	setTempo( Engine::getSong()->getTempo() );
-
-	connect( Engine::getSong(), SIGNAL( tempoChanged( lmms::bpm_t ) ),
-			this, SLOT( setTempo( lmms::bpm_t ) ), Qt::DirectConnection );
-	connect( Engine::audioEngine(), SIGNAL( sampleRateChanged() ),
-				this, SLOT( updateSampleRate() ) );
-
-	// update once per second
-	m_idleTimer.start( 1000 );
-	connect( &m_idleTimer, SIGNAL( timeout() ),
-				this, SLOT( idleUpdate() ) );
-}
-
-
-
-
-VstPlugin::~VstPlugin()
-{
-	delete m_pluginWidget;
+	return pluginType;
 }
 
 
@@ -311,6 +388,9 @@ void VstPlugin::saveSettings( QDomDocument & _doc, QDomElement & _this )
 
 void VstPlugin::toggleUI()
 {
+	// Ensure plugin is initialized before toggling UI
+	ensureInitialized();
+
 	if ( m_embedMethod == "none" )
 	{
 		RemotePlugin::toggleUI();
@@ -503,6 +583,7 @@ QWidget *VstPlugin::editor()
 
 void VstPlugin::openPreset()
 {
+	ensureInitialized();
 	gui::FileDialog ofd(nullptr, tr("Open Preset"), "", tr("VST Plugin Preset (*.fxp *.fxb)"));
 	ofd.setFileMode(gui::FileDialog::ExistingFiles);
 	if (ofd.exec() == QDialog::Accepted && !ofd.selectedFiles().isEmpty())
@@ -520,6 +601,7 @@ void VstPlugin::openPreset()
 
 void VstPlugin::setProgram( int index )
 {
+	ensureInitialized();
 	lock();
 	sendMessage( message( IdVstSetProgram ).addInt( index ) );
 	waitForMessage( IdVstSetProgram, true );
@@ -531,6 +613,7 @@ void VstPlugin::setProgram( int index )
 
 void VstPlugin::rotateProgram( int offset )
 {
+	ensureInitialized();
 	lock();
 	sendMessage( message( IdVstRotateProgram ).addInt( offset ) );
 	waitForMessage( IdVstRotateProgram, true );
@@ -613,6 +696,7 @@ void VstPlugin::savePreset()
 
 void VstPlugin::setParam( int i, float f )
 {
+	ensureInitialized();
 	lock();
 	sendMessage( message( IdVstSetParameter ).addInt( i ).addFloat( f ) );
 	//waitForMessage( IdVstSetParameter, true );
@@ -630,6 +714,9 @@ void VstPlugin::idleUpdate()
 
 void VstPlugin::showUI()
 {
+	// Ensure plugin is initialized before showing UI
+	ensureInitialized();
+
 	if ( m_embedMethod == "none" )
 	{
 		RemotePlugin::showUI();
@@ -645,9 +732,14 @@ void VstPlugin::showUI()
 
 void VstPlugin::hideUI()
 {
+	// No need to initialize just to hide UI
 	if ( m_embedMethod == "none" )
 	{
-		RemotePlugin::hideUI();
+		// Only call RemotePlugin::hideUI() if process is running
+		if (isRunning() && !failed())
+		{
+			RemotePlugin::hideUI();
+		}
 	}
 	else if ( pluginWidget() != nullptr )
 	{
