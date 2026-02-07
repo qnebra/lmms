@@ -114,8 +114,8 @@ void SubWindow::setWidget( QWidget * widget )
 			this,
 			[this]( QObject * obj )
 			{
-				// Compare pointers directly; obj is already being destroyed
-				if( static_cast<void*>(m_childWithFilter) == static_cast<void*>(obj) )
+				// Compare pointers directly; obj is the widget being destroyed
+				if( m_childWithFilter == obj )
 				{
 					m_childWithFilter = nullptr;
 					m_cachedWinIcon = QPixmap(); // Clear cached icon
@@ -157,7 +157,12 @@ void SubWindow::updateCachedIcon()
 	if( widget() )
 	{
 		m_cachedWinIcon = widget()->windowIcon().pixmap( m_buttonSize );
-		m_cachedIconLogicalSize = m_cachedWinIcon.size() / m_cachedWinIcon.devicePixelRatio();
+		// Calculate logical size for HiDPI displays
+		qreal dpr = m_cachedWinIcon.devicePixelRatio();
+		m_cachedIconLogicalSize = QSize(
+			static_cast<int>(m_cachedWinIcon.width() / dpr),
+			static_cast<int>(m_cachedWinIcon.height() / dpr)
+		);
 	}
 }
 
