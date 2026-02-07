@@ -49,6 +49,34 @@ namespace lmms
 
 using namespace std;
 
+namespace
+{
+// RAII helper to save and restore widget update state
+class UpdatesDisabler
+{
+public:
+	explicit UpdatesDisabler(QWidget* widget)
+		: m_widget(widget)
+		, m_wasEnabled(widget ? widget->updatesEnabled() : true)
+	{
+		if (m_widget) { m_widget->setUpdatesEnabled(false); }
+	}
+	
+	~UpdatesDisabler()
+	{
+		if (m_widget) { m_widget->setUpdatesEnabled(m_wasEnabled); }
+	}
+	
+	// Prevent copying
+	UpdatesDisabler(const UpdatesDisabler&) = delete;
+	UpdatesDisabler& operator=(const UpdatesDisabler&) = delete;
+	
+private:
+	QWidget* m_widget;
+	bool m_wasEnabled;
+};
+} // anonymous namespace
+
 
 InstrumentLoaderThread::InstrumentLoaderThread( QObject *parent, InstrumentTrack *it, QString name ) :
 	QThread( parent ),
@@ -258,16 +286,12 @@ void TrackContainerView::scrollToTrackView( TrackView * _tv )
 void TrackContainerView::realignTracks()
 {
 	// Block updates during batch operation to prevent redundant redraws
-	setUpdatesEnabled(false);
+	UpdatesDisabler disableUpdates(this);
 	
 	for (const auto& trackView : m_trackViews)
 	{
 		trackView->show();
-		trackView->update();
 	}
-	
-	// Re-enable updates and trigger single consolidated repaint
-	setUpdatesEnabled(true);
 	
 	emit tracksRealigned();
 }
@@ -348,16 +372,13 @@ void TrackContainerView::setPixelsPerBar( int ppb )
 	m_ppb = ppb;
 
 	// Block updates during batch background updates
-	setUpdatesEnabled(false);
+	UpdatesDisabler disableUpdates(this);
 	
 	// tell all TrackContentWidgets to update their background tile pixmap
 	for (const auto& trackView : m_trackViews)
 	{
 		trackView->getTrackContentWidget()->updateBackground();
 	}
-	
-	// Re-enable and trigger single update
-	setUpdatesEnabled(true);
 }
 
 
