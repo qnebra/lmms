@@ -34,6 +34,7 @@
 #include <QPushButton>
 #include <QScrollBar>
 #include <QStyleOption>
+#include <QTimer>
 #include <QToolTip>
 #include <cmath>
 
@@ -1822,10 +1823,8 @@ void AutomationEditor::zoomingXChanged()
 {
 	m_pendingZoomX = m_zoomXLevels[m_zoomingXModel.value()] * DEFAULT_PPB;
 	
-	if (!m_zoomXUpdateTimer->isActive())
-	{
-		m_zoomXUpdateTimer->start();
-	}
+	// Restart timer to implement true debouncing (apply after input settles)
+	m_zoomXUpdateTimer->start();
 }
 
 
@@ -1833,12 +1832,8 @@ void AutomationEditor::zoomingXChanged()
 
 void AutomationEditor::zoomingYChanged()
 {
-	const QString & zfac = m_zoomingYModel.currentText();
-	
-	if (!m_zoomYUpdateTimer->isActive())
-	{
-		m_zoomYUpdateTimer->start();
-	}
+	// Restart timer to implement true debouncing (apply after input settles)
+	m_zoomYUpdateTimer->start();
 }
 
 

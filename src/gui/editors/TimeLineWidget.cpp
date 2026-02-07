@@ -53,8 +53,11 @@ TimeLineWidget::TimeLineWidget(const int xoff, const int yoff, const float ppb, 
 	m_ppb{ppb},
 	m_timeline{&timeline},
 	m_begin{begin},
-	m_cachedPPB{static_cast<int>(ppb)},
+	m_cachedPPB{ppb},
 	m_cachedWidth{0},
+	m_cachedXOffset{xoff},
+	m_cachedBegin{begin},
+	m_cachedTicksPerBar{TimePos::ticksPerBar()},
 	m_backgroundDirty{true}
 {
 	move( 0, yoff );
@@ -63,6 +66,10 @@ TimeLineWidget::TimeLineWidget(const int xoff, const int yoff, const float ppb, 
 
 	connect( Engine::getSong(), SIGNAL(timeSignatureChanged(int,int)),
 					this, SLOT(update()));
+	// Invalidate cache on time signature change
+	connect( Engine::getSong(), &Song::timeSignatureChanged, this, [this]() {
+		m_backgroundDirty = true;
+	});
 	connect(m_timeline, &Timeline::positionChanged, this, qOverload<>(&QWidget::update));
 }
 
@@ -79,6 +86,8 @@ TimeLineWidget::~TimeLineWidget()
 void TimeLineWidget::setXOffset(const int x)
 {
 	m_xOffset = x;
+	m_backgroundDirty = true;
+	update();
 }
 
 void TimeLineWidget::addToolButtons( QToolBar * _tool_bar )
@@ -177,8 +186,11 @@ void TimeLineWidget::renderBackground()
 		}
 	}
 	
-	m_cachedPPB = static_cast<int>(m_ppb);
+	m_cachedPPB = m_ppb;
 	m_cachedWidth = width();
+	m_cachedXOffset = m_xOffset;
+	m_cachedBegin = m_begin;
+	m_cachedTicksPerBar = TimePos::ticksPerBar();
 	m_backgroundDirty = false;
 }
 
@@ -187,7 +199,13 @@ void TimeLineWidget::paintEvent( QPaintEvent * )
 	QPainter p(this);
 	
 	// Check if we need to re-render background
-	if (m_backgroundDirty || static_cast<int>(m_ppb) != m_cachedPPB || width() != m_cachedWidth)
+	// Use fuzzy comparison for float ppb and check all cache dependencies
+	bool ppbChanged = !qFuzzyCompare(m_ppb + 1.0f, m_cachedPPB + 1.0f);
+	bool geometryChanged = (width() != m_cachedWidth) || (m_xOffset != m_cachedXOffset);
+	bool scrollChanged = (m_begin != m_cachedBegin);
+	bool timeSignatureChanged = (TimePos::ticksPerBar() != m_cachedTicksPerBar);
+	
+	if (m_backgroundDirty || ppbChanged || geometryChanged || scrollChanged || timeSignatureChanged)
 	{
 		renderBackground();
 	}
@@ -209,7 +227,16 @@ void TimeLineWidget::paintEvent( QPaintEvent * )
 
 	// Draw the main loop rectangle (inner fill only)
 	QRect outerRectangle( loopStart, loopRectMargin, loopRectWidth - 1, loopRectHeight - 1 );
-	p.fillRect( outerRectangle, loopPointsActive ? getActiveLoopBrush() : getInactiveLoopBrush());
+	
+	// Ensure brush is semi-transparent so bar lines from cached background remain visible
+	QBrush loopBrush = loopPointsActive ? getActiveLoopBrush() : getInactiveLoopBrush();
+	QColor brushColor = loopBrush.color();
+	if (brushColor.alpha() == 255)
+	{
+		brushColor.setAlpha(128);
+		loopBrush.setColor(brushColor);
+	}
+	p.fillRect( outerRectangle, loopBrush);
 
 	// Draw the loop rectangle's outer outline
 	p.setPen( loopPointsActive ? getActiveLoopColor() : getInactiveLoopColor() );

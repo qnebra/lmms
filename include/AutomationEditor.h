@@ -40,6 +40,7 @@
 
 class QPushButton;
 class QScrollBar;
+class QTimer;
 
 namespace lmms
 {
@@ -300,7 +301,6 @@ private:
 	QTimer* m_zoomXUpdateTimer;
 	QTimer* m_zoomYUpdateTimer;
 	int m_pendingZoomX;
-	int m_pendingZoomY;
 
 	friend class AutomationEditorWindow;
 
