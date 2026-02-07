@@ -161,7 +161,7 @@ public:
 
 private:
 	friend class AutomationClip;  // Allow direct member access for efficiency
-	
+
 	// Clip that this node belongs to
 	AutomationClip* m_clip;
 
