@@ -132,13 +132,19 @@ bool VstEffect::openPlugin(const QString& plugin)
 
 	QMutexLocker ml( &m_pluginMutex ); Q_UNUSED( ml );
 	// Create new VstPlugin instance with lazy initialization
-	// Process spawning is deferred until first use
 	m_plugin = QSharedPointer<VstPlugin>(new VstPlugin(plugin));
 
-	// Note: With lazy initialization, the plugin process is not spawned here.
-	// It will be spawned on first audio processing call (in process()).
-	// This allows unused/muted plugins to consume no RAM.
-	// Full plugin loading and validation will happen during ensureInitialized().
+	// Trigger initialization in non-RT context to detect issues early
+	// This provides immediate user feedback if the plugin cannot be loaded
+	m_plugin->ensureInitialized();
+
+	if( m_plugin->failed() )
+	{
+		m_plugin.clear();
+		delete tf;
+		collectErrorForUI(VstPlugin::tr("The VST plugin %1 could not be loaded.").arg(plugin));
+		return false;
+	}
 
 	delete tf;
 

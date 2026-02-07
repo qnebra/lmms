@@ -25,7 +25,9 @@
 #ifndef _VST_PLUGIN_H
 #define _VST_PLUGIN_H
 
+#include <atomic>
 #include <QMap>
+#include <QMutex>
 #include <QPointer>
 #include <QSize>
 #include <QString>
@@ -50,9 +52,6 @@ public:
 	void tryLoad( const QString &remoteVstPluginExecutable );
 
 	bool processMessage( const message & _m ) override;
-
-	// Lazy initialization support
-	void ensureInitialized() override;
 
 	inline bool hasEditor() const
 	{
@@ -145,6 +144,10 @@ public slots:
 
 	void handleClientEmbed();
 
+protected:
+	// Lazy initialization support - thread-safe initialization hook
+	void ensureInitialized() override;
+
 private:
 	void loadChunk( const QByteArray & _chunk );
 	QByteArray saveChunk();
@@ -182,7 +185,14 @@ private:
 	QTimer m_idleTimer;
 
 	// Lazy initialization support
-	bool m_lazyInitialized;
+	enum class InitState {
+		Uninitialized,
+		Initializing,
+		Initialized,
+		Failed
+	};
+	std::atomic<InitState> m_initState;
+	QMutex m_initMutex;
 
 } ;
 

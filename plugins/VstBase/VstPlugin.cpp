@@ -33,6 +33,7 @@
 #include <QFileInfo>
 #include <QLocale>
 #include <QTemporaryFile>
+#include <QThread>
 
 #if defined(LMMS_BUILD_LINUX) && (QT_VERSION < QT_VERSION_CHECK(6,0,0))
 #	include <QX11Info>
@@ -124,7 +125,7 @@ VstPlugin::VstPlugin( const QString & _plugin ) :
 			: "headless" ),
 	m_version( 0 ),
 	m_currentProgram(),
-	m_lazyInitialized( false )
+	m_initState( InitState::Uninitialized )
 {
 	setSplittedChannels( true );
 
@@ -147,38 +148,83 @@ VstPlugin::~VstPlugin()
 
 void VstPlugin::ensureInitialized()
 {
-	// Check if already initialized
-	if (m_lazyInitialized)
+	// Fast path: already initialized
+	InitState state = m_initState.load(std::memory_order_acquire);
+	if (state == InitState::Initialized)
+	{
+		return;
+	}
+	
+	// If failed previously, don't retry
+	if (state == InitState::Failed)
 	{
 		return;
 	}
 
-	m_lazyInitialized = true;
+	// Slow path: need to initialize
+	QMutexLocker locker(&m_initMutex);
+	
+	// Double-check after acquiring lock
+	state = m_initState.load(std::memory_order_acquire);
+	if (state == InitState::Initialized || state == InitState::Failed)
+	{
+		return;
+	}
+	
+	// Check if another thread is already initializing
+	if (state == InitState::Initializing)
+	{
+		// Wait for the other thread to finish
+		// This is a simple busy-wait; a condition variable would be better
+		// but adds complexity. Given initialization is rare, this is acceptable.
+		locker.unlock();
+		while (m_initState.load(std::memory_order_acquire) == InitState::Initializing)
+		{
+			QThread::msleep(10);
+		}
+		return;
+	}
 
+	// Mark as initializing
+	m_initState.store(InitState::Initializing, std::memory_order_release);
+
+#ifdef DEBUG_VST
 	qDebug() << "VstPlugin: Lazy initialization for" << m_plugin;
+#endif
 
 	// Detect plugin type and load appropriate RemoteVstPlugin executable
 	auto pluginType = detectPluginType(m_plugin);
 
+	bool success = false;
 	switch(pluginType)
 	{
 	case ExecutableType::Win64:
 		tryLoad( REMOTE_VST_PLUGIN_FILEPATH_64 ); // Default: RemoteVstPlugin64
+		success = !failed();
 		break;
 	case ExecutableType::Win32:
 		tryLoad( REMOTE_VST_PLUGIN_FILEPATH_32 ); // Default: 32/RemoteVstPlugin32
+		success = !failed();
 		break;
 #ifdef LMMS_BUILD_LINUX
 	case ExecutableType::Linux64:
 		tryLoad( NATIVE_LINUX_REMOTE_VST_PLUGIN_FILEPATH_64 ); // Default: NativeLinuxRemoteVstPlugin64
+		success = !failed();
 		break;
 #endif
 	default:
 		m_failed = true;
+		success = false;
+		break;
+	}
+
+	if (!success)
+	{
+		m_initState.store(InitState::Failed, std::memory_order_release);
 		return;
 	}
 
-	// Setup signal connections and timer
+	// Setup signal connections and timer only after successful load
 	setTempo( Engine::getSong()->getTempo() );
 
 	connect( Engine::getSong(), SIGNAL( tempoChanged( lmms::bpm_t ) ),
@@ -190,6 +236,9 @@ void VstPlugin::ensureInitialized()
 	m_idleTimer.start( 1000 );
 	connect( &m_idleTimer, SIGNAL( timeout() ),
 				this, SLOT( idleUpdate() ) );
+
+	// Mark as successfully initialized
+	m_initState.store(InitState::Initialized, std::memory_order_release);
 }
 
 

@@ -142,13 +142,15 @@ public:
 		m_commMutex.unlock();
 	}
 
-	// Hook for lazy initialization - subclasses can override to defer
-	// expensive initialization until first use
-	virtual void ensureInitialized() {}
-
 public slots:
 	virtual void showUI();
 	virtual void hideUI();
+
+protected:
+	// Hook for lazy initialization - subclasses can override to defer
+	// expensive initialization until first use.
+	// Note: Must be thread-safe and avoid heavy work if called from audio thread.
+	virtual void ensureInitialized() {}
 
 protected:
 	inline void setSplittedChannels( bool _on )
