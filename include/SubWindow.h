@@ -75,7 +75,7 @@ public:
 	// Update works automatically if QMdiSubWindows are used.
 	void updateTitleBar();
 	
-	void setWidget( QWidget * widget ) override;
+	void setWidget( QWidget * widget );
 
 protected:
 	// hook the QWidget move/resize events to update the tracked geometry
