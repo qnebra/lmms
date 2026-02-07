@@ -350,31 +350,28 @@ void AudioEngine::renderStageEffects()
 	AudioEngineWorkerThread::startAndWaitForJobs();
 
 	// removed all play handles which are done
+	for( PlayHandleList::Iterator it = m_playHandles.begin();
+						it != m_playHandles.end(); )
 	{
-		const auto removalLock = std::lock_guard{m_changeMutex};
-		for( PlayHandleList::Iterator it = m_playHandles.begin();
-							it != m_playHandles.end(); )
+		if( ( *it )->affinityMatters() &&
+			( *it )->affinity() != QThread::currentThread() )
 		{
-			if( ( *it )->affinityMatters() &&
-				( *it )->affinity() != QThread::currentThread() )
+			++it;
+			continue;
+		}
+		if( ( *it )->isFinished() )
+		{
+			(*it)->audioBusHandle()->removePlayHandle(*it);
+			if((*it)->type() == PlayHandle::Type::NotePlayHandle)
 			{
-				++it;
-				continue;
+				NotePlayHandleManager::release((NotePlayHandle*)*it);
 			}
-			if( ( *it )->isFinished() )
-			{
-				(*it)->audioBusHandle()->removePlayHandle(*it);
-				if((*it)->type() == PlayHandle::Type::NotePlayHandle)
-				{
-					NotePlayHandleManager::release((NotePlayHandle*)*it);
-				}
-				else delete *it;
-				it = m_playHandles.erase(it);
-			}
-			else
-			{
-				++it;
-			}
+			else delete *it;
+			it = m_playHandles.erase(it);
+		}
+		else
+		{
+			++it;
 		}
 	}
 }
@@ -402,21 +399,15 @@ void AudioEngine::renderStageMix()
 
 const SampleFrame* AudioEngine::renderNextBuffer()
 {
+	const auto lock = std::lock_guard{m_changeMutex};
+
 	m_profiler.startPeriod();
 	s_renderingThread = true;
 
-	{
-		const auto setupLock = std::lock_guard{m_changeMutex};
-		renderStageNoteSetup();     // STAGE 0: clear old play handles and buffers, setup new play handles
-	}
-
+	renderStageNoteSetup();     // STAGE 0: clear old play handles and buffers, setup new play handles
 	renderStageInstruments();   // STAGE 1: run and render all play handles
-	renderStageEffects();       // STAGE 2: process effects (includes removing finished play handles)
-
-	{
-		const auto mixLock = std::lock_guard{m_changeMutex};
-		renderStageMix();           // STAGE 3: do master mix in mixer
-	}
+	renderStageEffects();       // STAGE 2: process effects of all instrument- and sampletracks
+	renderStageMix();           // STAGE 3: do master mix in mixer
 
 	s_renderingThread = false;
 	m_profiler.finishPeriod(outputSampleRate(), m_framesPerPeriod);
