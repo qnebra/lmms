@@ -74,7 +74,6 @@ public:
 	/**
 	 * @brief Sets the inValue of an automation node and regenerates tangents
 	 * @param value Value to be assigned
-	 * @note THREADING: Caller must hold AutomationClip::m_clipMutex
 	 */
 	void setInValue(float value);
 
@@ -85,7 +84,6 @@ public:
 	/**
 	 * @brief Sets the outValue of an automation node and regenerates tangents
 	 * @param value Value to be assigned
-	 * @note THREADING: Caller must hold AutomationClip::m_clipMutex
 	 */
 	void setOutValue(float value);
 	void resetOutValue();
@@ -162,6 +160,8 @@ public:
 	}
 
 private:
+	friend class AutomationClip;  // Allow direct member access for efficiency
+
 	// Clip that this node belongs to
 	AutomationClip* m_clip;
 

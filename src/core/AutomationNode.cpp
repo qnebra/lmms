@@ -65,19 +65,15 @@ AutomationNode::AutomationNode(AutomationClip* clip, float inValue, float outVal
 }
 
 /**
- * @brief Sets the inValue of an automation node
- * @param Float value to be assigned
- * 
- * THREADING: This method assumes the caller holds m_clipMutex.
- * It modifies m_inValue and calls generateTangents_unlocked which
- * requires the lock. All known callers (GUI operations via friend
- * access and AutomationClip methods) acquire the lock before calling.
-*/
+ * @brief Sets the inValue of an automation node and regenerates tangents
+ * @param value Value to be assigned
+ */
 void AutomationNode::setInValue(float value)
 {
 	m_inValue = value;
 
 	// Recalculate the tangents from neighbor nodes
+	// Note: generateTangents() acquires m_clipMutex internally
 	AutomationClip::timeMap & tm = m_clip->getTimeMap();
 
 	// Get an iterator pointing to this node
@@ -86,23 +82,19 @@ void AutomationNode::setInValue(float value)
 	if (it != tm.begin()) { --it; }
 
 	// Generate tangents from the previously, current and next nodes
-	m_clip->generateTangents_unlocked(it, 3);
+	m_clip->generateTangents(it, 3);
 }
 
 /**
- * @brief Sets the outValue of an automation node
- * @param Float value to be assigned
- * 
- * THREADING: This method assumes the caller holds m_clipMutex.
- * It modifies m_outValue and calls generateTangents_unlocked which
- * requires the lock. All known callers (GUI operations via friend
- * access and AutomationClip methods) acquire the lock before calling.
-*/
+ * @brief Sets the outValue of an automation node and regenerates tangents
+ * @param value Value to be assigned
+ */
 void AutomationNode::setOutValue(float value)
 {
 	m_outValue = value;
 
 	// Recalculate the tangents from neighbor nodes
+	// Note: generateTangents() acquires m_clipMutex internally
 	AutomationClip::timeMap & tm = m_clip->getTimeMap();
 
 	// Get an iterator pointing to this node
@@ -111,7 +103,7 @@ void AutomationNode::setOutValue(float value)
 	if (it != tm.begin()) { --it; }
 
 	// Generate tangents from the previously, current and next nodes
-	m_clip->generateTangents_unlocked(it, 3);
+	m_clip->generateTangents(it, 3);
 }
 
 /**

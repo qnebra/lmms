@@ -29,6 +29,7 @@
 
 #include <QMap>
 #include <QPointer>
+#include <atomic>
 
 #include "AutomationNode.h"
 #include "Clip.h"
@@ -75,13 +76,13 @@ public:
 	// progression-type stuff
 	inline ProgressionType progressionType() const
 	{
-		return m_progressionType;
+		return m_progressionType.load(std::memory_order_relaxed);
 	}
 	void setProgressionType( ProgressionType _new_progression_type );
 
 	inline float getTension() const
 	{
-		return m_tension;
+		return m_tension.load(std::memory_order_relaxed);
 	}
 	void setTension( QString _new_tension );
 
@@ -236,9 +237,11 @@ private:
 	objectVector m_objects;
 	timeMap m_timeMap;	// actual values
 	timeMap m_oldTimeMap;	// old values for storing the values before setDragValue() is called.
-	float m_tension;
+	// Atomic for lock-free reads in audio thread hot path
+	std::atomic<float> m_tension;
 	bool m_hasAutomation;
-	ProgressionType m_progressionType;
+	// Atomic for lock-free reads in audio thread hot path
+	std::atomic<ProgressionType> m_progressionType;
 
 	bool m_dragging;
 	bool m_dragKeepOutValue; // Should we keep the current dragged node's outValue?
