@@ -385,6 +385,7 @@ void Sf2Instrument::openFile( const QString & _sf2File, bool updateTrackName )
 
 	// free the soundfont if one is selected
 	freeFont();
+	m_fontId = -1;
 
 	m_synthMutex.lock();
 
@@ -408,7 +409,7 @@ void Sf2Instrument::openFile( const QString & _sf2File, bool updateTrackName )
 
 	m_synthMutex.unlock();
 
-	if( m_fontId >= 0 )
+	if( loaded )
 	{
 		// Don't reset patch/bank, so that it isn't cleared when
 		// someone resolves a missing file
@@ -434,9 +435,13 @@ void Sf2Instrument::openFile( const QString & _sf2File, bool updateTrackName )
 
 void Sf2Instrument::updatePatch()
 {
-	if( m_fontId >= 0 && m_bankNum.value() >= 0 && m_patchNum.value() >= 0 )
+	const auto guard = std::lock_guard{m_synthMutex};
+
+	if( m_synth != nullptr &&
+		m_fontId >= 0 &&
+		m_bankNum.value() >= 0 &&
+		m_patchNum.value() >= 0 )
 	{
-		const auto guard = std::lock_guard{m_synthMutex};
 		fluid_synth_program_select( m_synth, m_channel, m_fontId,
 				m_bankNum.value(), m_patchNum.value() );
 	}
