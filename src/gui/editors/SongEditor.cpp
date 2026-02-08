@@ -58,6 +58,7 @@
 #include "TimeDisplayWidget.h"
 #include "TimeLineWidget.h"
 #include "TrackView.h"
+#include "TrackContainerView.h"
 
 namespace lmms::gui
 {
@@ -128,7 +129,7 @@ SongEditor::SongEditor( Song * song ) :
 	});
 
 	// Mark cache dirty when tracks are added (so we can connect to their clip signals)
-	connect(trackContainer(), &TrackContainer::trackAdded, this, [this](Track* track) {
+	connect(TrackContainer(), &TrackContainer::trackAdded, this, [this](Track* track) {
 		// Connect to clip add signal for this track
 		connect(track, &Track::clipAdded, this, [this]() {
 			m_selectableObjectsCacheDirty = true;
@@ -137,7 +138,7 @@ SongEditor::SongEditor( Song * song ) :
 	});
 
 	// Connect to existing tracks' clip signals
-	for (auto* track : trackContainer()->tracks()) {
+	for (auto* track : TrackContainer()->tracks()) {
 		connect(track, &Track::clipAdded, this, [this]() {
 			m_selectableObjectsCacheDirty = true;
 		});
