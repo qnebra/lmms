@@ -167,10 +167,18 @@ void SubWindow::updateCachedIcon()
 		m_cachedWinIcon = widget()->windowIcon().pixmap( m_buttonSize );
 		// Calculate logical size for HiDPI displays using proper rounding
 		qreal dpr = m_cachedWinIcon.devicePixelRatio();
-		m_cachedIconLogicalSize = QSize(
-			qRound(m_cachedWinIcon.width() / dpr),
-			qRound(m_cachedWinIcon.height() / dpr)
-		);
+		if( dpr > 0.0 )
+		{
+			qreal invDpr = 1.0 / dpr;
+			m_cachedIconLogicalSize = QSize(
+				qRound(m_cachedWinIcon.width() * invDpr),
+				qRound(m_cachedWinIcon.height() * invDpr)
+			);
+		}
+		else
+		{
+			m_cachedIconLogicalSize = m_cachedWinIcon.size();
+		}
 	}
 }
 
