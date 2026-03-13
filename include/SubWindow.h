@@ -74,8 +74,6 @@ public:
 	// TODO Needed to update the title bar when replacing instruments.
 	// Update works automatically if QMdiSubWindows are used.
 	void updateTitleBar();
-	
-	void setWidget( QWidget * widget );
 
 protected:
 	// hook the QWidget move/resize events to update the tracked geometry
@@ -117,6 +115,7 @@ private:
 	static void elideText( QLabel *label, QString text );
 	void adjustTitleBar();
 	void updateCachedIcon();
+	void ensureChildFilterInstalled();
 
 private slots:
 	void focusChanged( QMdiSubWindow * subWindow );

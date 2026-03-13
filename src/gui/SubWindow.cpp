@@ -89,27 +89,27 @@ SubWindow::SubWindow(QWidget *parent, Qt::WindowFlags windowFlags) :
 
 
 
-void SubWindow::setWidget( QWidget * widget )
+void SubWindow::ensureChildFilterInstalled()
 {
-	// Remove event filter from previous widget if it exists
-	if( m_childWithFilter && m_childWithFilter != widget )
-	{
-		m_childWithFilter->removeEventFilter( this );
-		m_childWithFilter = nullptr;
-		m_cachedWinIcon = QPixmap(); // Clear cached icon
-	}
+	QWidget * currentWidget = widget();
 	
-	QMdiSubWindow::setWidget( widget );
-	
-	// Install event filter on the new widget to listen for icon/title/resize changes
-	if( widget && widget != m_childWithFilter )
+	// Check if we need to install or update the filter
+	if( currentWidget && currentWidget != m_childWithFilter )
 	{
-		widget->installEventFilter( this );
-		m_childWithFilter = widget;
+		// Remove event filter from previous widget if it exists
+		if( m_childWithFilter )
+		{
+			m_childWithFilter->removeEventFilter( this );
+			m_cachedWinIcon = QPixmap(); // Clear cached icon
+		}
+		
+		// Install event filter on the current widget
+		currentWidget->installEventFilter( this );
+		m_childWithFilter = currentWidget;
 		
 		// Ensure m_childWithFilter is cleared if the widget is destroyed elsewhere
 		QObject::connect(
-			widget,
+			currentWidget,
 			&QObject::destroyed,
 			this,
 			[this]( QObject * obj )
@@ -146,6 +146,13 @@ bool SubWindow::eventFilter( QObject * obj, QEvent * event )
 			adjustTitleBar();
 			return false;
 		}
+		else if( event->type() == QEvent::DevicePixelRatioChange )
+		{
+			// DPR changed (e.g., moved to different monitor), refresh cached icon
+			updateCachedIcon();
+			update(); // Schedule a repaint
+			return false;
+		}
 	}
 	return QMdiSubWindow::eventFilter( obj, event );
 }
@@ -158,11 +165,11 @@ void SubWindow::updateCachedIcon()
 	if( widget() )
 	{
 		m_cachedWinIcon = widget()->windowIcon().pixmap( m_buttonSize );
-		// Calculate logical size for HiDPI displays
+		// Calculate logical size for HiDPI displays using proper rounding
 		qreal dpr = m_cachedWinIcon.devicePixelRatio();
 		m_cachedIconLogicalSize = QSize(
-			static_cast<int>(m_cachedWinIcon.width() / dpr),
-			static_cast<int>(m_cachedWinIcon.height() / dpr)
+			qRound(m_cachedWinIcon.width() / dpr),
+			qRound(m_cachedWinIcon.height() / dpr)
 		);
 	}
 }
@@ -200,6 +207,9 @@ void SubWindow::paintEvent( QPaintEvent * )
 	// window icon
 	if( widget() )
 	{
+		// Ensure event filter is installed (handles case where setWidget bypassed)
+		ensureChildFilterInstalled();
+		
 		// Use cached pixmap to avoid repeated icon rasterization
 		if( m_cachedWinIcon.isNull() )
 		{
@@ -445,6 +455,9 @@ void SubWindow::adjustTitleBar()
 
 	if( widget() )
 	{
+		// Ensure event filter is installed (handles case where setWidget bypassed)
+		ensureChildFilterInstalled();
+		
 		// title QLabel adjustments
 		m_windowTitle->setAlignment( Qt::AlignHCenter );
 		
