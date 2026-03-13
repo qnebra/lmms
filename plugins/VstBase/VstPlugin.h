@@ -25,7 +25,9 @@
 #ifndef _VST_PLUGIN_H
 #define _VST_PLUGIN_H
 
+#include <atomic>
 #include <QMap>
+#include <QMutex>
 #include <QPointer>
 #include <QSize>
 #include <QString>
@@ -142,11 +144,21 @@ public slots:
 
 	void handleClientEmbed();
 
+	// Lazy initialization support - thread-safe initialization hook
+	void ensureInitialized() override;
+
 private:
 	void loadChunk( const QByteArray & _chunk );
 	QByteArray saveChunk();
 
 	void toggleEditorVisibility(int visible = -1);
+
+	// Helper for detecting plugin type (Win32/Win64/Linux64)
+	enum class ExecutableType
+	{
+		Unknown, Win32, Win64, Linux64,
+	};
+	ExecutableType detectPluginType(const QString& pluginPath);
 
 	QString m_plugin;
 	QPointer<QWidget> m_pluginWidget;
@@ -170,6 +182,16 @@ private:
 	int m_currentProgram;
 
 	QTimer m_idleTimer;
+
+	// Lazy initialization support
+	enum class InitState {
+		Uninitialized,
+		Initializing,
+		Initialized,
+		Failed
+	};
+	std::atomic<InitState> m_initState;
+	QMutex m_initMutex;
 
 } ;
 
