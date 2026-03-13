@@ -36,9 +36,20 @@ MidiWinMM::MidiWinMM() :
 	m_inputDevices(),
 	m_outputDevices(),
 	m_inputSubs(),
-	m_outputSubs()
+	m_outputSubs(),
+	m_deviceListUpdateTimer(),
+	m_lastInputDeviceCount(0),
+	m_lastOutputDeviceCount(0)
 {
 	openDevices();
+	
+	// Initialize device counts for hot-plug detection
+	m_lastInputDeviceCount = midiInGetNumDevs();
+	m_lastOutputDeviceCount = midiOutGetNumDevs();
+	
+	// Start timer to check for device changes every 2 seconds
+	connect(&m_deviceListUpdateTimer, SIGNAL(timeout()), this, SLOT(checkForDeviceChanges()));
+	m_deviceListUpdateTimer.start(2000);
 }
 
 
@@ -299,6 +310,22 @@ void MidiWinMM::openDevices()
 		{
 			m_outputDevices[hm] = QString::fromWCharArray(c.szPname);
 		}
+	}
+}
+
+
+
+
+void MidiWinMM::checkForDeviceChanges()
+{
+	const int currentInputCount = midiInGetNumDevs();
+	const int currentOutputCount = midiOutGetNumDevs();
+	
+	if (currentInputCount != m_lastInputDeviceCount || currentOutputCount != m_lastOutputDeviceCount)
+	{
+		m_lastInputDeviceCount = currentInputCount;
+		m_lastOutputDeviceCount = currentOutputCount;
+		updateDeviceList();
 	}
 }
 
