@@ -462,6 +462,8 @@ private:
 
 	//! Rebuilds the per-MIDI-key index for fast note lookup
 	void rebuildNotesIndex();
+	//! Marks the index as dirty, requiring a rebuild
+	void markNotesIndexDirty();
 
 	// turn a selection rectangle into selected notes
 	void computeSelectedNotes( bool shift );
@@ -515,6 +517,8 @@ private:
 
 	//! Per-MIDI-key index for fast note lookup in noteUnderMouse
 	std::array<std::vector<Note*>, NumKeys> m_notesByKey;
+	//! Flag indicating the index needs rebuilding
+	bool m_notesIndexDirty = true;
 
 	// qproperty fields
 	QColor m_barLineColor;

@@ -901,7 +901,7 @@ void PianoRoll::setCurrentMidiClip( MidiClip* newMidiClip )
 	connect( m_midiClip->instrumentTrack(), SIGNAL( midiNoteOn( const lmms::Note& ) ), this, SLOT( startRecordNote( const lmms::Note& ) ) );
 	connect( m_midiClip->instrumentTrack(), SIGNAL( midiNoteOff( const lmms::Note& ) ), this, SLOT( finishRecordNote( const lmms::Note& ) ) );
 	connect( m_midiClip, SIGNAL(dataChanged()), this, SLOT(update()));
-	connect( m_midiClip, &MidiClip::dataChanged, this, &PianoRoll::rebuildNotesIndex);
+	connect( m_midiClip, &MidiClip::dataChanged, this, &PianoRoll::markNotesIndexDirty);
 	connect( m_midiClip->instrumentTrack()->pianoModel(), SIGNAL(dataChanged()), this, SLOT(update()));
 
 	connect(m_midiClip->instrumentTrack()->firstKeyModel(), SIGNAL(dataChanged()), this, SLOT(update()));
@@ -911,7 +911,7 @@ void PianoRoll::setCurrentMidiClip( MidiClip* newMidiClip )
 		this, SLOT(update()));
 	connect(m_midiClip, &MidiClip::lengthChanged, this, qOverload<>(&QWidget::update));
 
-	rebuildNotesIndex();
+	markNotesIndexDirty();
 	update();
 	emit currentMidiClipChanged();
 }
@@ -5052,7 +5052,10 @@ bool PianoRoll::mouseOverNote()
 
 
 
-
+void PianoRoll::markNotesIndexDirty()
+{
+	m_notesIndexDirty = true;
+}
 
 
 void PianoRoll::rebuildNotesIndex()
@@ -5066,6 +5069,7 @@ void PianoRoll::rebuildNotesIndex()
 	// Return early if no valid clip
 	if (!hasValidMidiClip())
 	{
+		m_notesIndexDirty = false;
 		return;
 	}
 
@@ -5079,11 +5083,19 @@ void PianoRoll::rebuildNotesIndex()
 			m_notesByKey[key].push_back(note);
 		}
 	}
+
+	m_notesIndexDirty = false;
 }
 
 
 Note * PianoRoll::noteUnderMouse()
 {
+	// Rebuild index on-demand if dirty
+	if (m_notesIndexDirty)
+	{
+		rebuildNotesIndex();
+	}
+
 	QPoint pos = mapFromGlobal( QCursor::pos() );
 
 	if (pos.x() <= m_whiteKeyWidth
