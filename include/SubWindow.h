@@ -28,6 +28,8 @@
 #define LMMS_GUI_SUBWINDOW_H
 
 #include <QMdiSubWindow>
+#include <QPixmap>
+#include <QSize>
 #include <QString>
 
 #include "lmms_export.h"
@@ -85,12 +87,11 @@ public slots:
 
 protected:
 	// hook the QWidget move/resize events to update the tracked geometry
-	void moveEvent(QMoveEvent* event) override;
-	void resizeEvent(QResizeEvent* event) override;
-	void paintEvent(QPaintEvent* pe) override;
-	void changeEvent(QEvent* event) override;
-	void showEvent(QShowEvent* e) override;
-	bool eventFilter(QObject* obj, QEvent* event) override;
+	void moveEvent( QMoveEvent * event ) override;
+	void resizeEvent( QResizeEvent * event ) override;
+	void paintEvent( QPaintEvent * pe ) override;
+	void changeEvent( QEvent * event ) override;
+	bool eventFilter( QObject * obj, QEvent * event ) override;
 
 signals:
 	void focusLost();
@@ -111,9 +112,22 @@ private:
 	QGraphicsDropShadowEffect * m_shadow;
 	bool m_hasFocus;
 	bool m_isDetachable;
+	
+	// Performance optimization: cache child widget icon
+	QPixmap m_cachedWinIcon;
+	QSize m_cachedIconLogicalSize;
+	QWidget * m_childWithFilter;
+	
+	// Performance optimization: cache last title state to avoid redundant updates
+	QString m_lastWindowTitle;
+	int m_lastTitleWidth;
 
 	static void elideText( QLabel *label, QString text );
 	void adjustTitleBar();
+	void updateCachedIcon();
+	// Lazily installs event filter on current widget to handle cases where
+	// setWidget is called through the base QMdiSubWindow interface (not virtual)
+	void ensureChildFilterInstalled();
 
 private slots:
 	void focusChanged( QMdiSubWindow * subWindow );

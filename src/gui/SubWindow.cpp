@@ -50,12 +50,14 @@ namespace lmms::gui
 {
 
 
-SubWindow::SubWindow(QWidget* parent, Qt::WindowFlags windowFlags)
-	: QMdiSubWindow{parent, windowFlags}
-	, m_buttonSize{17, 17}
-	, m_titleBarHeight{titleBarHeight()}
-	, m_hasFocus{false}
+SubWindow::SubWindow(QWidget *parent, Qt::WindowFlags windowFlags) :
+	QMdiSubWindow(parent, windowFlags),
+	m_buttonSize(17, 17),
+	m_titleBarHeight(titleBarHeight()),
+	m_hasFocus(false),
 	, m_isDetachable{true}
+	m_childWithFilter(nullptr),
+	m_lastTitleWidth(-1) // -1 forces initial title update
 {
 	// initialize the tracked geometry to whatever Qt thinks the normal geometry currently is.
 	// this should always work, since QMdiSubWindows will not start as maximized
@@ -110,6 +112,101 @@ SubWindow::SubWindow(QWidget* parent, Qt::WindowFlags windowFlags)
 
 
 
+void SubWindow::ensureChildFilterInstalled()
+{
+	QWidget * currentWidget = widget();
+	
+	// Check if we need to install or update the filter
+	if( currentWidget && currentWidget != m_childWithFilter )
+	{
+		// Remove event filter from previous widget if it exists
+		if( m_childWithFilter )
+		{
+			m_childWithFilter->removeEventFilter( this );
+			m_cachedWinIcon = QPixmap(); // Clear cached icon
+		}
+		
+		// Install event filter on the current widget
+		currentWidget->installEventFilter( this );
+		m_childWithFilter = currentWidget;
+		
+		// Ensure m_childWithFilter is cleared if the widget is destroyed elsewhere
+		QObject::connect(
+			currentWidget,
+			&QObject::destroyed,
+			this,
+			[this]( QObject * obj )
+			{
+				// obj is the destroyed widget; compare with our cached pointer
+				// (Both are QObject* since widget is being destroyed)
+				if( m_childWithFilter == obj )
+				{
+					m_childWithFilter = nullptr;
+					m_cachedWinIcon = QPixmap(); // Clear cached icon
+				}
+			}
+		);
+		
+		updateCachedIcon();
+	}
+	else if( !currentWidget && m_childWithFilter )
+	{
+		// Widget was cleared, clean up our references
+		m_childWithFilter = nullptr;
+		m_cachedWinIcon = QPixmap();
+	}
+}
+
+
+
+
+bool SubWindow::eventFilter( QObject * obj, QEvent * event )
+{
+	if( obj == m_childWithFilter )
+	{
+		if( event->type() == QEvent::WindowIconChange )
+		{
+			updateCachedIcon();
+			update(); // Schedule a repaint
+			return false;
+		}
+		else if( event->type() == QEvent::WindowTitleChange || event->type() == QEvent::Resize )
+		{
+			adjustTitleBar();
+			return false;
+		}
+		else if( event->type() == QEvent::DevicePixelRatioChange )
+		{
+			// DPR changed (e.g., moved to different monitor), refresh cached icon
+			updateCachedIcon();
+			update(); // Schedule a repaint
+			return false;
+		}
+	}
+	return QMdiSubWindow::eventFilter( obj, event );
+}
+
+
+
+
+void SubWindow::updateCachedIcon()
+{
+	if( widget() )
+	{
+		m_cachedWinIcon = widget()->windowIcon().pixmap( m_buttonSize );
+		// Calculate logical size for HiDPI displays using proper rounding
+		qreal dpr = m_cachedWinIcon.devicePixelRatio();
+		qreal invDpr = 1.0 / dpr;
+		m_cachedIconLogicalSize = QSize(
+			qRound(m_cachedWinIcon.width() * invDpr),
+			qRound(m_cachedWinIcon.height() * invDpr)
+		);
+	}
+}
+
+
+
+
 /**
  * @brief SubWindow::paintEvent
  * 
@@ -140,8 +237,29 @@ void SubWindow::paintEvent( QPaintEvent * )
 	// window icon
 	if( widget() )
 	{
-		QPixmap winicon( widget()->windowIcon().pixmap( m_buttonSize ) );
-		p.drawPixmap( 3, 3, m_buttonSize.width(), m_buttonSize.height(), winicon );
+		// Ensure event filter is installed (handles case where setWidget bypassed)
+		ensureChildFilterInstalled();
+		
+		// Use cached pixmap to avoid repeated icon rasterization
+		if( m_cachedWinIcon.isNull() )
+		{
+			updateCachedIcon();
+		}
+		
+		if( !m_cachedWinIcon.isNull() )
+		{
+			// Prefer drawing at native size to avoid per-paint scaling work.
+			// Fall back to scaled drawing only if the cached pixmap size does not
+			// match the intended button size (including HiDPI considerations).
+			if( m_cachedIconLogicalSize == m_buttonSize )
+			{
+				p.drawPixmap( 3, 3, m_cachedWinIcon );
+			}
+			else
+			{
+				p.drawPixmap( QRect( 3, 3, m_buttonSize.width(), m_buttonSize.height() ), m_cachedWinIcon );
+			}
+		}
 	}
 }
 
@@ -514,23 +632,42 @@ void SubWindow::adjustTitleBar()
 
 	if( widget() )
 	{
+		// Ensure event filter is installed (handles case where setWidget bypassed)
+		ensureChildFilterInstalled();
+		
 		// title QLabel adjustments
 		m_windowTitle->setAlignment( Qt::AlignHCenter );
-		m_windowTitle->setFixedWidth( widget()->width() - ( menuButtonSpace + buttonBarWidth ) );
-		m_windowTitle->move( menuButtonSpace,
-			( m_titleBarHeight / 2 ) - ( m_windowTitle->sizeHint().height() / 2 ) - 1 );
-
+		
+		// Calculate the required width for the title
+		int titleWidth = widget()->width() - ( menuButtonSpace + buttonBarWidth );
+		
 		// if minimized we can't use widget()->width(). We have to hard code the width,
 		// as the width of all minimized windows is the same.
 		if( isMinimized() )
 		{
-			m_windowTitle->setFixedWidth( 120 );
+			titleWidth = 120;
 		}
-
-		// truncate the label string if the window is to small. Adds "..."
-		elideText( m_windowTitle, widget()->windowTitle() );
+		
+		// Get current window title
+		QString currentTitle = widget()->windowTitle();
+		
+		// Only update if title or width changed
+		if( currentTitle != m_lastWindowTitle || titleWidth != m_lastTitleWidth )
+		{
+			m_lastWindowTitle = currentTitle;
+			m_lastTitleWidth = titleWidth;
+			
+			m_windowTitle->setFixedWidth( titleWidth );
+			
+			// truncate the label string if the window is to small. Adds "..."
+			elideText( m_windowTitle, currentTitle );
+			m_windowTitle->adjustSize();
+		}
+		
+		// Position and interaction flags should be updated even if title/width didn't change
+		m_windowTitle->move( menuButtonSpace,
+			( m_titleBarHeight / 2 ) - ( m_windowTitle->sizeHint().height() / 2 ) - 1 );
 		m_windowTitle->setTextInteractionFlags( Qt::NoTextInteraction );
-		m_windowTitle->adjustSize();
 	}
 }
 
