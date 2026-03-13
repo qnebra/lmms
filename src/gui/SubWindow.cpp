@@ -126,6 +126,12 @@ void SubWindow::ensureChildFilterInstalled()
 		
 		updateCachedIcon();
 	}
+	else if( !currentWidget && m_childWithFilter )
+	{
+		// Widget was cleared, clean up our references
+		m_childWithFilter = nullptr;
+		m_cachedWinIcon = QPixmap();
+	}
 }
 
 
@@ -167,18 +173,11 @@ void SubWindow::updateCachedIcon()
 		m_cachedWinIcon = widget()->windowIcon().pixmap( m_buttonSize );
 		// Calculate logical size for HiDPI displays using proper rounding
 		qreal dpr = m_cachedWinIcon.devicePixelRatio();
-		if( dpr > 0.0 )
-		{
-			qreal invDpr = 1.0 / dpr;
-			m_cachedIconLogicalSize = QSize(
-				qRound(m_cachedWinIcon.width() * invDpr),
-				qRound(m_cachedWinIcon.height() * invDpr)
-			);
-		}
-		else
-		{
-			m_cachedIconLogicalSize = m_cachedWinIcon.size();
-		}
+		qreal invDpr = 1.0 / dpr;
+		m_cachedIconLogicalSize = QSize(
+			qRound(m_cachedWinIcon.width() * invDpr),
+			qRound(m_cachedWinIcon.height() * invDpr)
+		);
 	}
 }
 

@@ -115,6 +115,8 @@ private:
 	static void elideText( QLabel *label, QString text );
 	void adjustTitleBar();
 	void updateCachedIcon();
+	// Lazily installs event filter on current widget to handle cases where
+	// setWidget is called through the base QMdiSubWindow interface (not virtual)
 	void ensureChildFilterInstalled();
 
 private slots:
