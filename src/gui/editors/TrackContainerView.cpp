@@ -257,10 +257,18 @@ void TrackContainerView::scrollToTrackView( TrackView * _tv )
 
 void TrackContainerView::realignTracks()
 {
-	for (const auto& trackView : m_trackViews)
+	performBatchUpdate([this]() {
+		for (const auto& trackView : m_trackViews)
+		{
+			trackView->show();
+		}
+	});
+
+	// Trigger single consolidated repaint
+	QWidget * scrollContent = m_scrollArea->widget();
+	if (scrollContent)
 	{
-		trackView->show();
-		trackView->update();
+		scrollContent->update();
 	}
 
 	emit tracksRealigned();
@@ -341,10 +349,23 @@ void TrackContainerView::setPixelsPerBar( int ppb )
 {
 	m_ppb = ppb;
 
-	// tell all TrackContentWidgets to update their background tile pixmap
-	for (const auto& trackView : m_trackViews)
+	performBatchUpdate([this]() {
+		// tell all TrackContentWidgets to update their background tile pixmap
+		for (const auto& trackView : m_trackViews)
+		{
+			trackView->getTrackContentWidget()->updateBackground();
+		}
+	});
+
+	// Ensure the scroll area's content/viewport is repainted after the batch,
+	// since individual update() calls were suppressed while updates were disabled.
+	if ( m_scrollArea->widget() )
 	{
-		trackView->getTrackContentWidget()->updateBackground();
+		m_scrollArea->widget()->update();
+	}
+	if ( m_scrollArea->viewport() )
+	{
+		m_scrollArea->viewport()->update();
 	}
 }
 
