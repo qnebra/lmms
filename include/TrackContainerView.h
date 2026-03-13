@@ -216,7 +216,7 @@ void TrackContainerView::performBatchUpdate( F&& updateFunction )
 {
 	// Save current update state
 	bool wasUpdatesEnabled = updatesEnabled();
-	QWidget* scrollContent = m_scrollArea->widget();
+	QWidget * scrollContent = m_scrollArea->widget();
 	bool scrollWasUpdatesEnabled = scrollContent ? scrollContent->updatesEnabled() : true;
 	
 	// Block updates

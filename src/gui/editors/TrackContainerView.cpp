@@ -265,7 +265,7 @@ void TrackContainerView::realignTracks()
 	});
 
 	// Trigger single consolidated repaint
-	QWidget *scrollContent = m_scrollArea->widget();
+	QWidget * scrollContent = m_scrollArea->widget();
 	if (scrollContent)
 	{
 		scrollContent->update();
@@ -359,20 +359,13 @@ void TrackContainerView::setPixelsPerBar( int ppb )
 
 	// Ensure the scroll area's content/viewport is repainted after the batch,
 	// since individual update() calls were suppressed while updates were disabled.
-	if (m_scrollArea)
+	if ( m_scrollArea->widget() )
 	{
-		if (m_scrollArea->widget())
-		{
-			m_scrollArea->widget()->update();
-		}
-		if (m_scrollArea->viewport())
-		{
-			m_scrollArea->viewport()->update();
-		}
+		m_scrollArea->widget()->update();
 	}
-	else
+	if ( m_scrollArea->viewport() )
 	{
-		update();
+		m_scrollArea->viewport()->update();
 	}
 }
 
