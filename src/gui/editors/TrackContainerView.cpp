@@ -265,7 +265,7 @@ void TrackContainerView::realignTracks()
 	});
 
 	// Trigger single consolidated repaint
-	QWidget* scrollContent = m_scrollArea->widget();
+	QWidget *scrollContent = m_scrollArea->widget();
 	if (scrollContent)
 	{
 		scrollContent->update();
