@@ -329,6 +329,9 @@ bool RemotePlugin::init(const QString &pluginExecutable,
 
 bool RemotePlugin::process( const SampleFrame* _in_buf, SampleFrame* _out_buf )
 {
+	// Ensure plugin is initialized before processing
+	ensureInitialized();
+
 	const fpp_t frames = Engine::audioEngine()->framesPerPeriod();
 
 	if( m_failed || !isRunning() )
