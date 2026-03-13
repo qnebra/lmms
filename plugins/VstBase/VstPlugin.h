@@ -144,7 +144,6 @@ public slots:
 
 	void handleClientEmbed();
 
-protected:
 	// Lazy initialization support - thread-safe initialization hook
 	void ensureInitialized() override;
 
