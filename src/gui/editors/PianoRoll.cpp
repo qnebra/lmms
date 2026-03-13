@@ -4989,7 +4989,7 @@ void PianoRoll::updatePositionStepRecording( const TimePos & t )
 
 void PianoRoll::zoomingChanged()
 {
-	m_pendingZoomX = m_zoomLevels[m_zoomingModel.value()] * DEFAULT_PR_PPB;
+	m_pendingZoomX = static_cast<int>(m_zoomLevels[m_zoomingModel.value()] * DEFAULT_PR_PPB);
 	
 	// Restart the timer on every change to debounce zoom updates:
 	// applyZoomXChange() will be called only after the user stops changing zoom.
