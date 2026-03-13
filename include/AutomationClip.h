@@ -74,6 +74,14 @@ public:
 	const objectVector& objects() const;
 
 	// progression-type stuff
+	//
+	// NOTE: These getters use relaxed atomic loads and are intentionally
+	//       weakly-consistent with respect to other clip state such as
+	//       the mutex-protected m_timeMap. They are suitable for fast,
+	//       possibly stale, independent reads. Callers that require a
+	//       fully coherent snapshot with m_timeMap or other fields must
+	//       use an appropriate mutex-protected access path instead of
+	//       relying on these inline accessors.
 	inline ProgressionType progressionType() const
 	{
 		return m_progressionType.load(std::memory_order_relaxed);
