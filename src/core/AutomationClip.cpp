@@ -65,8 +65,8 @@ AutomationClip::AutomationClip( const AutomationClip & _clip_to_copy ) :
 	Clip(_clip_to_copy),
 	m_autoTrack( _clip_to_copy.m_autoTrack ),
 	m_objects( _clip_to_copy.m_objects ),
-	m_tension( _clip_to_copy.m_tension ),
-	m_progressionType(_clip_to_copy.m_progressionType),
+	m_tension( _clip_to_copy.m_tension.load(std::memory_order_relaxed) ),
+	m_progressionType(_clip_to_copy.m_progressionType.load(std::memory_order_relaxed)),
 	m_dragging(false),
 	m_isRecording(_clip_to_copy.m_isRecording),
 	m_lastRecordedValue(0)
@@ -124,7 +124,7 @@ void AutomationClip::setProgressionType(
 		_new_progression_type == ProgressionType::Linear ||
 		_new_progression_type == ProgressionType::CubicHermite )
 	{
-		m_progressionType = _new_progression_type;
+		m_progressionType.store(_new_progression_type, std::memory_order_relaxed);
 		emit dataChanged();
 	}
 }
@@ -141,7 +141,7 @@ void AutomationClip::setTension( QString _new_tension )
 
 	if( ok && nt > -0.01 && nt < 1.01 )
 	{
-		m_tension = nt;
+		m_tension.store(nt, std::memory_order_relaxed);
 	}
 }
 
@@ -249,7 +249,7 @@ TimePos AutomationClip::putValue(
 		}
 	}
 	if (it != m_timeMap.begin()) { --it; }
-	generateTangents(it, 3);
+	generateTangents_unlocked(it, 3);
 
 	updateLength();
 
@@ -305,7 +305,7 @@ TimePos AutomationClip::putValues(
 		}
 	}
 	if (it != m_timeMap.begin()) { --it; }
-	generateTangents(it, 3);
+	generateTangents_unlocked(it, 3);
 
 	updateLength();
 
@@ -329,7 +329,7 @@ void AutomationClip::removeNode(const TimePos & time)
 	{
 		--it;
 	}
-	generateTangents(it, 3);
+	generateTangents_unlocked(it, 3);
 
 	updateLength();
 
@@ -402,13 +402,15 @@ void AutomationClip::resetNodes(const int tick0, const int tick1)
 
 void AutomationClip::resetTangents(const int tick0, const int tick1)
 {
+	QMutexLocker m(&m_clipMutex);
+
 	if (tick0 == tick1)
 	{
 		auto it = m_timeMap.find(TimePos(tick0));
 		if (it != m_timeMap.end())
 		{
 			it.value().setLockedTangents(false);
-			generateTangents(it, 1);
+			generateTangents_unlocked(it, 1);
 		}
 		return;
 	}
@@ -419,7 +421,7 @@ void AutomationClip::resetTangents(const int tick0, const int tick1)
 	for (auto it = m_timeMap.lowerBound(start), endIt = m_timeMap.upperBound(end); it != endIt; ++it)
 	{
 		it.value().setLockedTangents(false);
-		generateTangents(it, 1);
+		generateTangents_unlocked(it, 1);
 	}
 }
 
@@ -506,7 +508,7 @@ TimePos AutomationClip::setDragValue(
 	//Restore to the state before it the point were being dragged
 	m_timeMap = m_oldTimeMap;
 
-	generateTangents();
+	generateTangents_unlocked();
 
 	TimePos returnedPos;
 
@@ -593,19 +595,24 @@ float AutomationClip::valueAt( const TimePos & _time ) const
 
 // This method will get the value at an offset from a node, so we use the outValue of
 // that node and the inValue of the next node for the calculations.
+// NOTE: This is a hot-path method called frequently in the audio thread (~86 times/sec per clip).
+// The iterator is already validated by the calling valueAt(TimePos) method which holds the lock.
+// 
+// THREADING: Reads m_progressionType and m_tension using atomic loads with relaxed ordering.
+// This avoids undefined behavior while maintaining lock-free performance on the audio thread.
 float AutomationClip::valueAt( timeMap::const_iterator v, int offset ) const
 {
-	QMutexLocker m(&m_clipMutex);
-
 	// We never use it with offset 0, but doesn't hurt to return a correct
 	// value if we do
 	if (offset == 0) { return INVAL(v); }
 
-	if (m_progressionType == ProgressionType::Discrete)
+	ProgressionType progType = m_progressionType.load(std::memory_order_relaxed);
+	
+	if (progType == ProgressionType::Discrete)
 	{
 		return OUTVAL(v);
 	}
-	else if( m_progressionType == ProgressionType::Linear )
+	else if( progType == ProgressionType::Linear )
 	{
 		auto const nv = std::next(v);
 		float slope =
@@ -628,8 +635,9 @@ float AutomationClip::valueAt( timeMap::const_iterator v, int offset ) const
 
 		int numValues = (POS(nv) - POS(v));
 		float t = (float) offset / (float) numValues;
-		float m1 = OUTTAN(v) * numValues * m_tension;
-		float m2 = INTAN(nv) * numValues * m_tension;
+		float tension = m_tension.load(std::memory_order_relaxed);
+		float m1 = OUTTAN(v) * numValues * tension;
+		float m2 = INTAN(nv) * numValues * tension;
 
 		auto t2 = t * t, t3 = t2 * t;
 		return (2 * t3 - 3 * t2 + 1) * OUTVAL(v)
@@ -682,15 +690,16 @@ void AutomationClip::flipY(int min, int max)
 
 		// To flip, that will be the new distance between
 		// the IN/OUT values and the min value
-		it.value().setInValue(min + inValDist);
-		it.value().setOutValue(min + outValDist);
+		// Direct member access to avoid nested locking and redundant tangent generation
+		it.value().m_inValue = min + inValDist;
+		it.value().m_outValue = min + outValDist;
 
 		changedTimeMap = true;
 	}
 
 	if (changedTimeMap)
 	{
-		generateTangents();
+		generateTangents_unlocked();
 		emit dataChanged();
 	}
 }
@@ -769,7 +778,7 @@ void AutomationClip::flipX(int start, int end)
 
 	cleanObjects();
 
-	generateTangents();
+	generateTangents_unlocked();
 	emit dataChanged();
 }
 
@@ -895,7 +904,7 @@ void AutomationClip::loadSettings( const QDomElement & _this )
 		changeLength( len );
 	}
 
-	if (shouldGenerateTangents) { generateTangents(); }
+	if (shouldGenerateTangents) { generateTangents_unlocked(); }
 }
 
 
@@ -1136,7 +1145,8 @@ void AutomationClip::cleanObjects()
 
 void AutomationClip::generateTangents()
 {
-	generateTangents(m_timeMap.begin(), m_timeMap.size());
+	QMutexLocker m(&m_clipMutex);
+	generateTangents_unlocked();
 }
 
 
@@ -1149,7 +1159,24 @@ void AutomationClip::generateTangents()
 void AutomationClip::generateTangents(timeMap::iterator it, int numToGenerate)
 {
 	QMutexLocker m(&m_clipMutex);
+	generateTangents_unlocked(it, numToGenerate);
+}
 
+
+
+
+// Unlocked variant - caller must hold m_clipMutex
+void AutomationClip::generateTangents_unlocked()
+{
+	generateTangents_unlocked(m_timeMap.begin(), m_timeMap.size());
+}
+
+
+
+
+// Unlocked variant - caller must hold m_clipMutex
+void AutomationClip::generateTangents_unlocked(timeMap::iterator it, int numToGenerate)
+{
 	for (int i = 0; i < numToGenerate && it != m_timeMap.end(); ++i, ++it)
 	{
 		// Skip the node if it has locked tangents (were manually edited)
