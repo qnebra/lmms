@@ -28,6 +28,8 @@
 #define LMMS_GUI_SUBWINDOW_H
 
 #include <QMdiSubWindow>
+#include <QPixmap>
+#include <QSize>
 #include <QString>
 
 #include "lmms_export.h"
@@ -79,6 +81,7 @@ protected:
 	void resizeEvent( QResizeEvent * event ) override;
 	void paintEvent( QPaintEvent * pe ) override;
 	void changeEvent( QEvent * event ) override;
+	bool eventFilter( QObject * obj, QEvent * event ) override;
 
 	QPushButton* addTitleButton(const std::string& iconName, const QString& toolTip);
 
@@ -99,9 +102,22 @@ private:
 	QLabel * m_windowTitle;
 	QGraphicsDropShadowEffect * m_shadow;
 	bool m_hasFocus;
+	
+	// Performance optimization: cache child widget icon
+	QPixmap m_cachedWinIcon;
+	QSize m_cachedIconLogicalSize;
+	QWidget * m_childWithFilter;
+	
+	// Performance optimization: cache last title state to avoid redundant updates
+	QString m_lastWindowTitle;
+	int m_lastTitleWidth;
 
 	static void elideText( QLabel *label, QString text );
 	void adjustTitleBar();
+	void updateCachedIcon();
+	// Lazily installs event filter on current widget to handle cases where
+	// setWidget is called through the base QMdiSubWindow interface (not virtual)
+	void ensureChildFilterInstalled();
 
 private slots:
 	void focusChanged( QMdiSubWindow * subWindow );
