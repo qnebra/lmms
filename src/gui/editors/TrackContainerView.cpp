@@ -357,7 +357,23 @@ void TrackContainerView::setPixelsPerBar( int ppb )
 		}
 	});
 
-	update();
+	// Ensure the scroll area's content/viewport is repainted after the batch,
+	// since individual update() calls were suppressed while updates were disabled.
+	if (m_scrollArea)
+	{
+		if (m_scrollArea->widget())
+		{
+			m_scrollArea->widget()->update();
+		}
+		if (m_scrollArea->viewport())
+		{
+			m_scrollArea->viewport()->update();
+		}
+	}
+	else
+	{
+		update();
+	}
 }
 
 
