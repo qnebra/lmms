@@ -139,7 +139,7 @@ private:
 	QPushButton * m_syncButton;
 	QPushButton * m_displayAutomatedOnly;
 	QPushButton * m_closeButton;
-	CustomTextKnob ** vstKnobs;
+	std::vector<CustomTextKnob*> vstKnobs;
 
 } ;
 
