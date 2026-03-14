@@ -123,7 +123,6 @@ void VstEffectControls::setParameter( Model * action )
 
 	QMutexLocker lock(&m_effect->m_pluginMutex);
 	QSharedPointer<VstPlugin> plugin = m_effect->m_plugin;
-	lock.unlock();
 
 	if (plugin != nullptr) {
 		plugin->setParam( knobUNID, knobFModel[knobUNID]->value() );
@@ -456,7 +455,6 @@ void ManageVSTEffectView::syncPlugin()
 
 	QMutexLocker lock(&m_effect->m_pluginMutex);
 	QSharedPointer<VstPlugin> plugin = m_effect->m_plugin;
-	lock.unlock();
 
 	if (plugin == nullptr) { return; }
 
@@ -517,7 +515,6 @@ void ManageVSTEffectView::setParameter( Model * action )
 
 	QMutexLocker lock(&m_effect->m_pluginMutex);
 	QSharedPointer<VstPlugin> plugin = m_effect->m_plugin;
-	lock.unlock();
 
 	if (plugin != nullptr) {
 		plugin->setParam( knobUNID, m_vi2->knobFModel[knobUNID]->value() );
