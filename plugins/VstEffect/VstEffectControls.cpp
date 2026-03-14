@@ -26,6 +26,7 @@
 #include <QDomElement>
 #include <QGridLayout>
 #include <QMenu>
+#include <QMutexLocker>
 #include <QPushButton>
 #include <QScrollArea>
 
@@ -82,7 +83,7 @@ void VstEffectControls::loadSettings( const QDomElement & _this )
 
 		const QMap<QString, QString> & dump = m_effect->m_plugin->parameterDump();
 		paramCount = dump.size();
-		auto paramStr = std::array<char, 35>{};
+		auto paramStr = std::array<char, 64>{};
 		knobFModel.resize(paramCount);
 		QStringList s_dumpValues;
 		for( int i = 0; i < paramCount; i++ )
@@ -115,8 +116,16 @@ void VstEffectControls::setParameter( Model * action )
 {
 	int knobUNID = action->displayName().toInt();
 
-	if ( m_effect->m_plugin != nullptr ) {
-		m_effect->m_plugin->setParam( knobUNID, knobFModel[knobUNID]->value() );
+	if (knobUNID < 0 || knobUNID >= static_cast<int>(knobFModel.size()))
+	{
+		return;
+	}
+
+	QMutexLocker lock(&m_effect->m_pluginMutex);
+	QSharedPointer<VstPlugin> plugin = m_effect->m_plugin;
+
+	if (plugin != nullptr) {
+		plugin->setParam( knobUNID, knobFModel[knobUNID]->value() );
 	}
 }
 
@@ -133,7 +142,7 @@ void VstEffectControls::saveSettings( QDomDocument & _doc, QDomElement & _this )
 		if (!knobFModel.empty()) {
 			const QMap<QString, QString> & dump = m_effect->m_plugin->parameterDump();
 			paramCount = dump.size();
-			auto paramStr = std::array<char, 35>{};
+			auto paramStr = std::array<char, 64>{};
 			for( int i = 0; i < paramCount; i++ )
 			{
 				if (knobFModel[i]->isAutomated() || knobFModel[i]->controllerConnection()) {
@@ -362,7 +371,7 @@ ManageVSTEffectView::ManageVSTEffectView( VstEffect * _eff, VstEffectControls * 
 	const QMap<QString, QString> & dump = m_effect->m_plugin->parameterDump();
 	m_vi->paramCount = dump.size();
 
-	vstKnobs = new CustomTextKnob *[ m_vi->paramCount ];
+	vstKnobs.resize(m_vi->paramCount);
 
 	bool hasKnobModel = true;
 	if (m_vi->knobFModel.empty())
@@ -371,7 +380,7 @@ ManageVSTEffectView::ManageVSTEffectView( VstEffect * _eff, VstEffectControls * 
 		hasKnobModel = false;
 	}
 
-	auto paramStr = std::array<char, 35>{};
+	auto paramStr = std::array<char, 64>{};
 	QStringList s_dumpValues;
 
 	for( int i = 0; i < m_vi->paramCount; i++ )
@@ -441,9 +450,15 @@ void ManageVSTEffectView::closeWindow()
 
 void ManageVSTEffectView::syncPlugin()
 {
-	auto paramStr = std::array<char, 35>{};
+	auto paramStr = std::array<char, 64>{};
 	QStringList s_dumpValues;
-	const QMap<QString, QString> & dump = m_effect->m_plugin->parameterDump();
+
+	QMutexLocker lock(&m_effect->m_pluginMutex);
+	QSharedPointer<VstPlugin> plugin = m_effect->m_plugin;
+
+	if (plugin == nullptr) { return; }
+
+	const QMap<QString, QString> & dump = plugin->parameterDump();
 
 	for( int i = 0; i < m_vi2->paramCount; i++ )
 	{
@@ -493,8 +508,16 @@ void ManageVSTEffectView::setParameter( Model * action )
 {
 	int knobUNID = action->displayName().toInt();
 
-	if ( m_effect->m_plugin != nullptr ) {
-		m_effect->m_plugin->setParam( knobUNID, m_vi2->knobFModel[knobUNID]->value() );
+	if (knobUNID < 0 || knobUNID >= static_cast<int>(m_vi2->knobFModel.size()))
+	{
+		return;
+	}
+
+	QMutexLocker lock(&m_effect->m_pluginMutex);
+	QSharedPointer<VstPlugin> plugin = m_effect->m_plugin;
+
+	if (plugin != nullptr) {
+		plugin->setParam( knobUNID, m_vi2->knobFModel[knobUNID]->value() );
 		syncParameterText();
 	}
 }
@@ -543,13 +566,8 @@ ManageVSTEffectView::~ManageVSTEffectView()
 		}
 	}
 
-	if( vstKnobs != nullptr )
-	{
-		delete [] vstKnobs;
-		vstKnobs = nullptr;
-	}
-
 	m_vi2->knobFModel.clear();
+	vstKnobs.clear();
 
 	if( m_vi2->m_scrollArea != nullptr )
 	{

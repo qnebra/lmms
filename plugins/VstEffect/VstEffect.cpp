@@ -85,18 +85,19 @@ Effect::ProcessStatus VstEffect::processImpl(SampleFrame* buf, const fpp_t frame
 	static thread_local auto tempBuf = std::array<SampleFrame, MAXIMUM_BUFFER_SIZE>();
 
 	std::memcpy(tempBuf.data(), buf, sizeof(SampleFrame) * frames);
-	if (m_pluginMutex.tryLock(Engine::getSong()->isExporting() ? -1 : 0))
+	const bool locked = m_pluginMutex.tryLock(Engine::getSong()->isExporting() ? -1 : 0);
+	if (locked)
 	{
 		m_plugin->process(tempBuf.data(), tempBuf.data());
 		m_pluginMutex.unlock();
-	}
 
-	const float w = wetLevel();
-	const float d = dryLevel();
-	for (fpp_t f = 0; f < frames; ++f)
-	{
-		buf[f][0] = w * tempBuf[f][0] + d * buf[f][0];
-		buf[f][1] = w * tempBuf[f][1] + d * buf[f][1];
+		const float w = wetLevel();
+		const float d = dryLevel();
+		for (fpp_t f = 0; f < frames; ++f)
+		{
+			buf[f][0] = w * tempBuf[f][0] + d * buf[f][0];
+			buf[f][1] = w * tempBuf[f][1] + d * buf[f][1];
+		}
 	}
 
 	return ProcessStatus::ContinueIfNotQuiet;
