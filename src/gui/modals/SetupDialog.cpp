@@ -50,6 +50,7 @@
 #include "AudioAlsaSetupWidget.h"
 #include "AudioDummy.h"
 #include "AudioJack.h"
+#include "AudioOss.h"
 #include "AudioPortAudio.h"
 #include "AudioPulseAudio.h"
 #include "AudioSdl.h"
@@ -62,6 +63,7 @@
 #include "MidiApple.h"
 #include "MidiDummy.h"
 #include "MidiJack.h"
+#include "MidiOss.h"
 #include "MidiSndio.h"
 #include "MidiWinMM.h"
 
@@ -535,6 +537,11 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 			new AudioSdl::setupWidget(as_w);
 #endif
 
+#ifdef LMMS_HAVE_OSS
+	m_audioIfaceSetupWidgets[AudioOss::name()] =
+			new AudioOss::setupWidget(as_w);
+#endif
+
 #ifdef LMMS_HAVE_SNDIO
 	m_audioIfaceSetupWidgets[AudioSndio::name()] =
 			new AudioSndio::setupWidget(as_w);
@@ -696,6 +703,11 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 #ifdef LMMS_HAVE_JACK
 	m_midiIfaceSetupWidgets[MidiJack::name()] =
 			MidiSetupWidget::create<MidiJack>(ms_w);
+#endif
+
+#ifdef LMMS_HAVE_OSS
+	m_midiIfaceSetupWidgets[MidiOss::name()] =
+			MidiSetupWidget::create<MidiOss>(ms_w);
 #endif
 
 #ifdef LMMS_HAVE_SNDIO
