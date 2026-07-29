@@ -185,6 +185,7 @@ public:
 
 	gui::ClipView * createView( gui::TrackView * _tv ) override;
 
+	bool isEmpty() const override { return m_timeMap.empty(); }
 
 	static AutomationClip * globalAutomationClip( AutomatableModel * _m );
 	static void resolveAllIDs();
