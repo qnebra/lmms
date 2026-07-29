@@ -54,7 +54,6 @@
 #include "AudioPulseAudio.h"
 #include "AudioSdl.h"
 #include "AudioSndio.h"
-#include "AudioSoundIo.h"
 
 // Platform-specific midi-interface classes.
 #include "MidiAlsaRaw.h"
@@ -523,11 +522,6 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 #ifdef LMMS_HAVE_PORTAUDIO
 	m_audioIfaceSetupWidgets[AudioPortAudio::name()] =
 			new AudioPortAudioSetupWidget(as_w);
-#endif
-
-#ifdef LMMS_HAVE_SOUNDIO
-	m_audioIfaceSetupWidgets[AudioSoundIo::name()] =
-			new AudioSoundIo::setupWidget(as_w);
 #endif
 
 #ifdef LMMS_HAVE_SDL

@@ -90,7 +90,6 @@ OPTION(WANT_OGGVORBIS	"Include OGG/Vorbis support" ON)
 OPTION(WANT_PULSEAUDIO	"Include PulseAudio support" ON)
 OPTION(WANT_PORTAUDIO	"Include PortAudio support" ON)
 OPTION(WANT_SNDIO	"Include sndio support" ON)
-OPTION(WANT_SOUNDIO	"Include libsoundio support" ON)
 OPTION(WANT_SDL		"Include SDL (Simple DirectMedia Layer) support" ON)
 OPTION(WANT_SF2		"Include SoundFont2 player plugin" ON)
 OPTION(WANT_GIG		"Include GIG player plugin" ON)
@@ -194,7 +193,6 @@ endif()
 IF(LMMS_BUILD_APPLE)
 	# Fix linking on 10.14+. See issue #4762 on github
 	LINK_DIRECTORIES("${APPLE_PREFIX}/lib")
-	SET(WANT_SOUNDIO OFF)
 	SET(WANT_ALSA OFF)
 	SET(WANT_PULSEAUDIO OFF)
 	SET(WANT_VST OFF)
@@ -210,7 +208,6 @@ IF(LMMS_BUILD_WIN32 OR LMMS_BUILD_CYGWIN)
 	SET(WANT_ALSA OFF)
 	SET(WANT_PULSEAUDIO OFF)
 	SET(WANT_SNDIO OFF)
-	SET(WANT_SOUNDIO OFF)
 	SET(WANT_WINMM ON)
 	SET(BUNDLE_QT_TRANSLATIONS ON)
 	SET(LMMS_HAVE_WINMM TRUE)
@@ -219,7 +216,6 @@ IF(LMMS_BUILD_WIN32 OR LMMS_BUILD_CYGWIN)
 	endif()
 	SET(STATUS_ALSA "<not supported on this platform>")
 	SET(STATUS_PULSEAUDIO "<not supported on this platform>")
-	SET(STATUS_SOUNDIO "<disabled in this release>")
 	SET(STATUS_SNDIO "<not supported on this platform>")
 	SET(STATUS_WINMM "OK")
 	SET(STATUS_APPLEMIDI "<not supported on this platform>")
@@ -487,21 +483,6 @@ IF(WANT_PORTAUDIO)
 			"if you require PortAudio support")
 	ENDIF()
 ENDIF(WANT_PORTAUDIO)
-
-# check for libsoundio
-IF(WANT_SOUNDIO)
-  FIND_PACKAGE(SoundIo)
-  IF(SOUNDIO_FOUND)
-	SET(LMMS_HAVE_SOUNDIO TRUE)
-	SET(STATUS_SOUNDIO "OK")
-	include_directories(SYSTEM "${SOUNDIO_INCLUDE_DIR}")
-  ELSE(SOUNDIO_FOUND)
-	SET(SOUNDIO_INCLUDE_DIR "")
-	SET(STATUS_SOUNDIO "not found, please install libsoundio if you require libsoundio support")
-	SET(SOUNDIO_LIBRARY "")
-  ENDIF(SOUNDIO_FOUND)
-ENDIF(WANT_SOUNDIO)
-
 
 # check for PulseAudio
 IF(WANT_PULSEAUDIO)
@@ -911,7 +892,6 @@ MESSAGE(
 "* JACK                        : ${STATUS_JACK}\n"
 "* Sndio                       : ${STATUS_SNDIO}\n"
 "* PortAudio                   : ${STATUS_PORTAUDIO}\n"
-"* libsoundio                  : ${STATUS_SOUNDIO}\n"
 "* PulseAudio                  : ${STATUS_PULSEAUDIO}\n"
 "* SDL                         : ${STATUS_SDL}\n"
 )
