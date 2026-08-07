@@ -65,14 +65,15 @@ AutomationNode::AutomationNode(AutomationClip* clip, float inValue, float outVal
 }
 
 /**
- * @brief Sets the inValue of an automation node
- * @param Float value to be assigned
-*/
+ * @brief Sets the inValue of an automation node and regenerates tangents
+ * @param value Value to be assigned
+ */
 void AutomationNode::setInValue(float value)
 {
 	m_inValue = value;
 
 	// Recalculate the tangents from neighbor nodes
+	// Note: generateTangents() acquires m_clipMutex internally
 	AutomationClip::timeMap & tm = m_clip->getTimeMap();
 
 	// Get an iterator pointing to this node
@@ -85,14 +86,15 @@ void AutomationNode::setInValue(float value)
 }
 
 /**
- * @brief Sets the outValue of an automation node
- * @param Float value to be assigned
-*/
+ * @brief Sets the outValue of an automation node and regenerates tangents
+ * @param value Value to be assigned
+ */
 void AutomationNode::setOutValue(float value)
 {
 	m_outValue = value;
 
 	// Recalculate the tangents from neighbor nodes
+	// Note: generateTangents() acquires m_clipMutex internally
 	AutomationClip::timeMap & tm = m_clip->getTimeMap();
 
 	// Get an iterator pointing to this node

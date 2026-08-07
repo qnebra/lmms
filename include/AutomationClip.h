@@ -29,6 +29,7 @@
 
 #include <QMap>
 #include <QPointer>
+#include <atomic>
 
 #include "AutomationNode.h"
 #include "Clip.h"
@@ -73,15 +74,23 @@ public:
 	const objectVector& objects() const;
 
 	// progression-type stuff
+	//
+	// NOTE: These getters use relaxed atomic loads and are intentionally
+	//       weakly-consistent with respect to other clip state such as
+	//       the mutex-protected m_timeMap. They are suitable for fast,
+	//       possibly stale, independent reads. Callers that require a
+	//       fully coherent snapshot with m_timeMap or other fields must
+	//       use an appropriate mutex-protected access path instead of
+	//       relying on these inline accessors.
 	inline ProgressionType progressionType() const
 	{
-		return m_progressionType;
+		return m_progressionType.load(std::memory_order_relaxed);
 	}
 	void setProgressionType( ProgressionType _new_progression_type );
 
 	inline float getTension() const
 	{
-		return m_tension;
+		return m_tension.load(std::memory_order_relaxed);
 	}
 	void setTension( QString _new_tension );
 
@@ -213,6 +222,9 @@ private:
 	void cleanObjects();
 	void generateTangents();
 	void generateTangents(timeMap::iterator it, int numToGenerate);
+	// Unlocked variants - caller must hold m_clipMutex
+	void generateTangents_unlocked();
+	void generateTangents_unlocked(timeMap::iterator it, int numToGenerate);
 	float valueAt( timeMap::const_iterator v, int offset ) const;
 
 	/**
@@ -233,9 +245,11 @@ private:
 	objectVector m_objects;
 	timeMap m_timeMap;	// actual values
 	timeMap m_oldTimeMap;	// old values for storing the values before setDragValue() is called.
-	float m_tension;
+	// Atomic for lock-free reads in audio thread hot path
+	std::atomic<float> m_tension;
 	bool m_hasAutomation;
-	ProgressionType m_progressionType;
+	// Atomic for lock-free reads in audio thread hot path
+	std::atomic<ProgressionType> m_progressionType;
 
 	bool m_dragging;
 	bool m_dragKeepOutValue; // Should we keep the current dragged node's outValue?

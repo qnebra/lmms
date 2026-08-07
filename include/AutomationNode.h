@@ -71,12 +71,20 @@ public:
 	{
 		return m_inValue;
 	}
+	/**
+	 * @brief Sets the inValue of an automation node and regenerates tangents
+	 * @param value Value to be assigned
+	 */
 	void setInValue(float value);
 
 	inline const float getOutValue() const
 	{
 		return m_outValue;
 	}
+	/**
+	 * @brief Sets the outValue of an automation node and regenerates tangents
+	 * @param value Value to be assigned
+	 */
 	void setOutValue(float value);
 	void resetOutValue();
 
@@ -152,6 +160,8 @@ public:
 	}
 
 private:
+	friend class AutomationClip;  // Allow direct member access for efficiency
+
 	// Clip that this node belongs to
 	AutomationClip* m_clip;
 
