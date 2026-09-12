@@ -30,6 +30,7 @@
 #ifdef LMMS_BUILD_WIN32
 #include <windows.h>
 #include <mmsystem.h>
+#include <QMutex>
 #include <QTimer>
 
 #include "MidiClient.h"
@@ -139,6 +140,7 @@ private:
 	using SubMap = QMap<QString, MidiPortList>;
 	SubMap m_inputSubs;
 	SubMap m_outputSubs;
+	mutable QMutex m_devicesMutex;
 
 	// hot-plug detection
 	QTimer m_deviceListUpdateTimer;
