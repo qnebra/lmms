@@ -41,6 +41,11 @@ public:
 	void * alloc();
 	void free( void * ptr );
 
+	//! Returns the number of elements still available for allocation.
+	size_t available() const { return m_available.load(std::memory_order_relaxed); }
+
+	//! Returns true if @p ptr was allocated from this pool (pointer range check).
+	bool isFromPool(const void * ptr) const;
 
 private:
 	char * m_pool;

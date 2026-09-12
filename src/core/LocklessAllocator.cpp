@@ -166,4 +166,11 @@ invalid:
 }
 
 
+bool LocklessAllocator::isFromPool(const void * ptr) const
+{
+	const ptrdiff_t diff = static_cast<const char *>(ptr) - m_pool;
+	return diff >= 0 && static_cast<size_t>(diff) < m_capacity * m_elementSize;
+}
+
+
 } // namespace lmms

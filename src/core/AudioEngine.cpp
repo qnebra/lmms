@@ -208,24 +208,27 @@ void AudioEngine::renderStageNoteSetup()
 
 	// remove all play-handles that have to be deleted and delete
 	// them if they still exist...
-	// maybe this algorithm could be optimized...
-	ConstPlayHandleList::Iterator it_rem = m_playHandlesToRemove.begin();
-	while( it_rem != m_playHandlesToRemove.end() )
+	if (!m_playHandlesToRemove.empty())
 	{
-		PlayHandleList::Iterator it = std::find( m_playHandles.begin(), m_playHandles.end(), *it_rem );
-
-		if( it != m_playHandles.end() )
+		PlayHandleList::Iterator it = m_playHandles.begin();
+		while (it != m_playHandles.end())
 		{
-			(*it)->audioBusHandle()->removePlayHandle(*it);
-			if((*it)->type() == PlayHandle::Type::NotePlayHandle)
+			if (m_playHandlesToRemove.count(*it))
 			{
-				NotePlayHandleManager::release((NotePlayHandle*)*it);
+				(*it)->audioBusHandle()->removePlayHandle(*it);
+				if ((*it)->type() == PlayHandle::Type::NotePlayHandle)
+				{
+					NotePlayHandleManager::release((NotePlayHandle*)*it);
+				}
+				else delete *it;
+				it = m_playHandles.erase(it);
 			}
-			else delete *it;
-			m_playHandles.erase(it);
+			else
+			{
+				++it;
+			}
 		}
-
-		it_rem = m_playHandlesToRemove.erase( it_rem );
+		m_playHandlesToRemove.clear();
 	}
 
 	swapBuffers();
@@ -375,7 +378,7 @@ void AudioEngine::clearInternal()
 	{
 		if (ph->type() != PlayHandle::Type::InstrumentPlayHandle)
 		{
-			m_playHandlesToRemove.push_back(ph);
+			m_playHandlesToRemove.insert(ph);
 		}
 	}
 }
@@ -529,7 +532,7 @@ void AudioEngine::removePlayHandle(PlayHandle * ph)
 	}
 	else
 	{
-		m_playHandlesToRemove.push_back(ph);
+		m_playHandlesToRemove.insert(ph);
 	}
 	doneChangeInModel();
 }
