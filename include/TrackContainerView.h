@@ -27,6 +27,7 @@
 
 #include <functional>
 #include <utility>
+#include <QPointer>
 #include <QVector>
 #include <QScrollArea>
 #include <QWidget>
@@ -216,7 +217,7 @@ void TrackContainerView::performBatchUpdate( F&& updateFunction )
 {
 	// Save current update state
 	bool wasUpdatesEnabled = updatesEnabled();
-	QWidget * scrollContent = m_scrollArea->widget();
+	QPointer<QWidget> scrollContent = m_scrollArea->widget();
 	bool scrollWasUpdatesEnabled = scrollContent ? scrollContent->updatesEnabled() : true;
 	
 	// Block updates
@@ -229,9 +230,6 @@ void TrackContainerView::performBatchUpdate( F&& updateFunction )
 	// Execute the batch update
 	std::invoke( std::forward<F>( updateFunction ) );
 
-	// Re-fetch scroll content in case updateFunction modified the widget tree
-	scrollContent = m_scrollArea->widget();
-	
 	// Restore previous update state
 	if ( scrollContent )
 	{
