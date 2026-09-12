@@ -210,6 +210,11 @@ void AudioEngine::renderStageNoteSetup()
 	// them if they still exist...
 	if (!m_playHandlesToRemove.empty())
 	{
+		// Single O(n) pass over m_playHandles: check each handle against the
+		// O(1) set. Handles queued for removal that are no longer in
+		// m_playHandles (already removed by another path) are implicitly
+		// dropped when we clear the set below — this matches the original
+		// behavior where the old inner find() simply returned end().
 		PlayHandleList::Iterator it = m_playHandles.begin();
 		while (it != m_playHandles.end())
 		{
