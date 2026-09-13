@@ -133,7 +133,7 @@ void AudioSndio::run()
 {
 	const auto framesPerAudioBuffer = audioEngine()->framesPerAudioBuffer();
 	const auto samplesPerAudioBuffer = framesPerAudioBuffer * channels();
-	thread_local const auto ditherer = FloatToInt16Ditherer{floatToInt16DitheringEnabled()};
+	const auto& ditherer = floatToInt16Ditherer();
 	auto fbuf = std::vector<sample_t>(samplesPerAudioBuffer);
 	auto ibuf = std::vector<int_sample_t>(samplesPerAudioBuffer);
 

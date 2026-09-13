@@ -28,6 +28,7 @@
 #include <QMutex>
 #include <samplerate.h>
 
+#include "FloatToInt16Ditherer.h"
 #include "LmmsTypes.h"
 
 class QThread;
@@ -82,7 +83,7 @@ protected:
 	ch_cnt_t channels() const { return m_channels; }
 
 	AudioEngine* audioEngine() { return m_audioEngine; }
-	bool floatToInt16DitheringEnabled() const noexcept { return m_floatToInt16DitherEnabled; }
+	const FloatToInt16Ditherer& floatToInt16Ditherer() const noexcept { return m_floatToInt16Ditherer; }
 
 	void setSampleRate(const sample_rate_t _new_sr) { m_sampleRate = _new_sr; }
 	void setChannels(const ch_cnt_t channels) { m_channels = channels; }
@@ -98,7 +99,7 @@ private:
 	sample_rate_t m_sampleRate;
 	ch_cnt_t m_channels;
 	AudioEngine* m_audioEngine = nullptr;
-	bool m_floatToInt16DitherEnabled = false;
+	FloatToInt16Ditherer m_floatToInt16Ditherer{false};
 	std::atomic_flag m_running = ATOMIC_FLAG_INIT;
 };
 

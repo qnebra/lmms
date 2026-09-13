@@ -26,7 +26,6 @@
 
 #include "AudioDevice.h"
 #include "AudioEngine.h"
-#include "FloatToInt16Ditherer.h"
 
 namespace lmms
 {
@@ -36,7 +35,7 @@ AudioDevice::AudioDevice(const ch_cnt_t _channels, AudioEngine* _audioEngine)
 	, m_sampleRate(_audioEngine->outputSampleRate())
 	, m_channels(_channels)
 	, m_audioEngine(_audioEngine)
-	, m_floatToInt16DitherEnabled(FloatToInt16Ditherer::isEnabledByDefault())
+	, m_floatToInt16Ditherer(FloatToInt16Ditherer::isEnabledByDefault())
 {
 }
 
@@ -97,7 +96,7 @@ int AudioDevice::convertToS16(const SampleFrame* _ab,
 								int_sample_t * _output_buffer,
 								const bool _convert_endian )
 {
-	thread_local const auto ditherer = FloatToInt16Ditherer{floatToInt16DitheringEnabled()};
+	const auto& ditherer = floatToInt16Ditherer();
 
 	if( _convert_endian )
 	{
