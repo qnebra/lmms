@@ -35,6 +35,7 @@ AudioDevice::AudioDevice(const ch_cnt_t _channels, AudioEngine* _audioEngine)
 	, m_sampleRate(_audioEngine->outputSampleRate())
 	, m_channels(_channels)
 	, m_audioEngine(_audioEngine)
+	, m_floatToInt16Ditherer(FloatToInt16Ditherer::isEnabledByDefault())
 {
 }
 
@@ -95,13 +96,15 @@ int AudioDevice::convertToS16(const SampleFrame* _ab,
 								int_sample_t * _output_buffer,
 								const bool _convert_endian )
 {
+	const auto& ditherer = floatToInt16Ditherer();
+
 	if( _convert_endian )
 	{
 		for( f_cnt_t frame = 0; frame < _frames; ++frame )
 		{
 			for( ch_cnt_t chnl = 0; chnl < channels(); ++chnl )
 			{
-				auto temp = static_cast<int_sample_t>(AudioEngine::clip(_ab[frame][chnl]) * OUTPUT_SAMPLE_MULTIPLIER);
+				auto temp = ditherer.convert(_ab[frame][chnl]);
 
 				( _output_buffer + frame * channels() )[chnl] =
 						( temp & 0x00ff ) << 8 |
@@ -116,7 +119,7 @@ int AudioDevice::convertToS16(const SampleFrame* _ab,
 			for( ch_cnt_t chnl = 0; chnl < channels(); ++chnl )
 			{
 				(_output_buffer + frame * channels())[chnl]
-					= static_cast<int_sample_t>(AudioEngine::clip(_ab[frame][chnl]) * OUTPUT_SAMPLE_MULTIPLIER);
+					= ditherer.convert(_ab[frame][chnl]);
 			}
 		}
 	}
