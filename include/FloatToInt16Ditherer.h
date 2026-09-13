@@ -36,7 +36,7 @@ namespace lmms
 class FloatToInt16Ditherer
 {
 public:
-	explicit FloatToInt16Ditherer(bool enabled = isEnabledByDefault()) noexcept :
+	explicit FloatToInt16Ditherer(bool enabled = isEnabledByDefault()) :
 		m_enabled(enabled)
 	{
 	}
