@@ -36,13 +36,14 @@ namespace
 constexpr char FloatToInt16DitheringSection[] = "audioengine";
 constexpr char FloatToInt16DitheringKey[] = "floattoint16dither";
 constexpr std::uint32_t FloatToInt16DitherSeed = 0x6d6d7301u;
+constexpr sample_t U24ToUnitScale = 1.0f / 16777216.0f;
 
 sample_t nextRandomSample() noexcept
 {
 	thread_local std::uint32_t s_state = FloatToInt16DitherSeed;
 
 	s_state = s_state * 1664525u + 1013904223u;
-	return static_cast<sample_t>((s_state >> 8) * (1.0 / 16777216.0));
+	return static_cast<sample_t>((s_state >> 8) * U24ToUnitScale);
 }
 
 } // namespace

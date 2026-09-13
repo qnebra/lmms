@@ -36,6 +36,7 @@ AudioDevice::AudioDevice(const ch_cnt_t _channels, AudioEngine* _audioEngine)
 	, m_sampleRate(_audioEngine->outputSampleRate())
 	, m_channels(_channels)
 	, m_audioEngine(_audioEngine)
+	, m_floatToInt16DitherEnabled(FloatToInt16Ditherer::isEnabledByDefault())
 {
 }
 
@@ -96,7 +97,7 @@ int AudioDevice::convertToS16(const SampleFrame* _ab,
 								int_sample_t * _output_buffer,
 								const bool _convert_endian )
 {
-	thread_local const auto ditherer = FloatToInt16Ditherer{};
+	thread_local const auto ditherer = FloatToInt16Ditherer{floatToInt16DitheringEnabled()};
 
 	if( _convert_endian )
 	{

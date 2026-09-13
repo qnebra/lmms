@@ -43,7 +43,7 @@ private slots:
 		QCOMPARE(ditherer.convert(0.5f * lsb), static_cast<int_sample_t>(1));
 		QCOMPARE(ditherer.convert(-0.5f * lsb), static_cast<int_sample_t>(-1));
 		QCOMPARE(ditherer.convert(2.0f), std::numeric_limits<int_sample_t>::max());
-		QCOMPARE(ditherer.convert(-2.0f), static_cast<int_sample_t>(-32767));
+		QCOMPARE(ditherer.convert(-2.0f), static_cast<int_sample_t>(-std::numeric_limits<int_sample_t>::max()));
 	}
 
 	void EnabledDither_DecorrelatesHalfLsbSamples()
