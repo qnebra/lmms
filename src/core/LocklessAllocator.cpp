@@ -25,6 +25,7 @@
 #include "LocklessAllocator.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdio>
 
 #include "lmmsconfig.h"
@@ -168,8 +169,10 @@ invalid:
 
 bool LocklessAllocator::isFromPool(const void * ptr) const
 {
-	const ptrdiff_t diff = static_cast<const char *>(ptr) - m_pool;
-	return diff >= 0 && static_cast<size_t>(diff) < m_capacity * m_elementSize;
+	const auto addr = reinterpret_cast<std::uintptr_t>(ptr);
+	const auto poolStart = reinterpret_cast<std::uintptr_t>(m_pool);
+	const auto poolEnd = poolStart + m_capacity * m_elementSize;
+	return addr >= poolStart && addr < poolEnd && (addr - poolStart) % m_elementSize == 0;
 }
 
 

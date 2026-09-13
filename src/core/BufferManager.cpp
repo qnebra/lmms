@@ -27,15 +27,16 @@
 #include "BufferManager.h"
 
 #include "LocklessAllocator.h"
+#include "PlayHandle.h"
 #include "SampleFrame.h"
 
 
 namespace lmms
 {
 
-// Must be at least as large as PlayHandle::MaxNumber (1024) so that every
+// Must be at least as large as PlayHandle::MaxNumber so that every
 // concurrent play handle can have a pooled buffer without falling back to heap.
-static constexpr std::size_t BufferPoolCapacity = 1024;
+static constexpr std::size_t BufferPoolCapacity = PlayHandle::MaxNumber;
 
 f_cnt_t BufferManager::s_framesPerPeriod;
 LocklessAllocator* BufferManager::s_pool = nullptr;
