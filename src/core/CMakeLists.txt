@@ -97,6 +97,7 @@ set(LMMS_SRCS
 	core/audio/AudioFileMP3.cpp
 	core/audio/AudioFileOgg.cpp
 	core/audio/AudioFileFlac.cpp
+	core/audio/FloatToInt16Ditherer.cpp
 	core/audio/AudioFileWave.cpp
 	core/audio/AudioJack.cpp
 	core/audio/AudioSndio.cpp
