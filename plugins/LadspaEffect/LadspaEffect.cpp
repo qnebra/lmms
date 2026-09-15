@@ -112,7 +112,10 @@ void LadspaEffect::changeSampleRate()
 	pluginInstantiation();
 	m_pluginMutex.unlock();
 
-	controls->effectModelChanged( m_controls );
+	if( m_controls )
+	{
+		controls->effectModelChanged( m_controls );
+	}
 	delete controls;
 
 	if( m_controls )
