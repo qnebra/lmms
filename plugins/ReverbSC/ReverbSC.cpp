@@ -22,6 +22,8 @@
 
 #include "ReverbSC.h"
 
+#include <QMutexLocker>
+
 #include "embed.h"
 #include "lmms_math.h"
 #include "plugin_export.h"
@@ -75,6 +77,8 @@ ReverbSCEffect::~ReverbSCEffect()
 
 Effect::ProcessStatus ReverbSCEffect::processImpl(SampleFrame* buf, const f_cnt_t frames)
 {
+	QMutexLocker locker(&mutex);
+
 	const float d = dryLevel();
 	const float w = wetLevel();
 

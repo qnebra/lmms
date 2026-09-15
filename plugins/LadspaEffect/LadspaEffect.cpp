@@ -115,7 +115,10 @@ void LadspaEffect::changeSampleRate()
 	controls->effectModelChanged( m_controls );
 	delete controls;
 
-	m_controls->restoreState( dataFile.content().firstChild().toElement() );
+	if( m_controls )
+	{
+		m_controls->restoreState( dataFile.content().firstChild().toElement() );
+	}
 
 	// the IDs of re-created controls have been saved and now need to be
 	// resolved again
