@@ -103,7 +103,8 @@ void LadspaEffect::changeSampleRate()
 {
 	DataFile dataFile( DataFile::Type::EffectSettings );
 	LadspaControls * controls = m_controls;
-	if( controls )
+	const bool hadControls = controls != nullptr;
+	if( hadControls )
 	{
 		controls->saveState( dataFile, dataFile.content() );
 	}
@@ -121,7 +122,7 @@ void LadspaEffect::changeSampleRate()
 	}
 	delete controls;
 
-	if( controls && m_controls )
+	if( hadControls && m_controls )
 	{
 		m_controls->restoreState( dataFile.content().firstChild().toElement() );
 	}
