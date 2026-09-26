@@ -41,6 +41,14 @@ public:
 	void * alloc();
 	void free( void * ptr );
 
+	//! Returns an approximate count of elements still available for allocation.
+	//! Uses a relaxed load, so the result may be stale by the time the caller
+	//! acts on it. Suitable only as a non-blocking hint (e.g. to skip a pool
+	//! alloc attempt when clearly exhausted), not for correctness decisions.
+	size_t available() const { return m_available.load(std::memory_order_relaxed); }
+
+	//! Returns true if @p ptr was allocated from this pool (pointer range check).
+	bool isFromPool(const void * ptr) const;
 
 private:
 	char * m_pool;
