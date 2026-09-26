@@ -116,7 +116,7 @@ public:
 	}
 
 
-private:// slots:
+private slots:
 	void updateDeviceList();
 
 
