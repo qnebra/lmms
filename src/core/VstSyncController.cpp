@@ -65,7 +65,7 @@ void VstSyncController::setAbsolutePosition(double ticks)
 {
 	if (!m_syncData) { return; }
 
-	const double ticksPerQuarter = static_cast<double>(TimePos::ticksPerBar()) / 4.0;
+	const double ticksPerQuarter = static_cast<double>(DefaultTicksPerQuarter);
 
 #ifdef VST_SNC_LATENCY
 	m_syncData->ppqPos = (ticks / ticksPerQuarter) - m_syncData->latency;
@@ -113,7 +113,7 @@ void VstSyncController::startCycle(int startTick, int endTick)
 {
 	if (!m_syncData) { return; }
 
-	const float ticksPerQuarter = static_cast<float>(TimePos::ticksPerBar()) / 4.0f;
+	const float ticksPerQuarter = static_cast<float>(DefaultTicksPerQuarter);
 	m_syncData->isCycle = true;
 	m_syncData->cycleStart = startTick / ticksPerQuarter;
 	m_syncData->cycleEnd = endTick / ticksPerQuarter;

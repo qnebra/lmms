@@ -84,7 +84,8 @@ const std::vector<DataFile::UpgradeMethod> DataFile::UPGRADE_METHODS = {
 	&DataFile::upgrade_defaultTripleOscillatorHQ,
 	&DataFile::upgrade_mixerRename      ,   &DataFile::upgrade_bbTcoRename,
 	&DataFile::upgrade_sampleAndHold    ,   &DataFile::upgrade_midiCCIndexing,
-	&DataFile::upgrade_loopsRename      ,   &DataFile::upgrade_noteTypes,
+	&DataFile::upgrade_loopsRename      ,   &DataFile::upgrade_legacyTicks,
+	&DataFile::upgrade_noteTypes,
 	&DataFile::upgrade_fixCMTDelays     ,   &DataFile::upgrade_fixBassLoopsTypo,
 	&DataFile::findProblematicLadspaPlugins,
 	&DataFile::upgrade_noHiddenAutomationTracks
@@ -2058,6 +2059,45 @@ void DataFile::upgrade_fixBassLoopsTypo()
 	mapSrcAttributeInElementsWithResources(replacementMap);
 }
 
+void DataFile::upgrade_legacyTicks()
+{
+	if ((type() != Type::SongProject && type() != Type::SongProjectTemplate))
+	{
+		return;
+	}
+
+	const auto legacyToCurrent = static_cast<double>(DefaultTicksPerBar) / LegacyTicksPerBar;
+	const auto scaleNodes = [](QDomNodeList& nodes, double scaleFactor)
+	{
+		for (int i = 0; i < nodes.size(); ++i)
+		{
+			QDomElement elem = nodes.item(i).toElement();
+			if (elem.isNull()) { continue; }
+			if (elem.hasAttribute("pos"))
+			{
+				elem.setAttribute("pos", QString::number(static_cast<int>(elem.attribute("pos").toInt() * scaleFactor)));
+			}
+			if (elem.hasAttribute("len"))
+			{
+				elem.setAttribute("len", QString::number(static_cast<int>(elem.attribute("len").toInt() * scaleFactor)));
+			}
+		}
+	};
+
+	QDomNodeList nodes = elementsByTagName("note");
+	scaleNodes(nodes, legacyToCurrent);
+	nodes = elementsByTagName("midiclip");
+	scaleNodes(nodes, legacyToCurrent);
+	nodes = elementsByTagName("patternclip");
+	scaleNodes(nodes, legacyToCurrent);
+	nodes = elementsByTagName("sampleclip");
+	scaleNodes(nodes, legacyToCurrent);
+	nodes = elementsByTagName("automationclip");
+	scaleNodes(nodes, legacyToCurrent);
+	nodes = elementsByTagName("time");
+	scaleNodes(nodes, legacyToCurrent);
+}
+
 void DataFile::upgrade()
 {
 	// Runs all necessary upgrade methods
@@ -2068,42 +2108,6 @@ void DataFile::upgrade()
 			(this->*um)();
 		}
 	);
-
-	// Compatibility migration for legacy projects saved with the old 192-tick-per-bar default.
-	// Only rescale older files; current projects are already in the 3840-tick-per-bar grid.
-	if ((type() == Type::SongProject || type() == Type::SongProjectTemplate) && m_fileVersion < UPGRADE_METHODS.size())
-	{
-		const auto legacyToCurrent = static_cast<double>(DefaultTicksPerBar) / LegacyTicksPerBar;
-		const auto scaleNodes = [](QDomNodeList& nodes, double scaleFactor)
-		{
-			for (int i = 0; i < nodes.size(); ++i)
-			{
-				QDomElement elem = nodes.item(i).toElement();
-				if (elem.isNull()) { continue; }
-				if (elem.hasAttribute("pos"))
-				{
-					elem.setAttribute("pos", QString::number(static_cast<int>(elem.attribute("pos").toInt() * scaleFactor)));
-				}
-				if (elem.hasAttribute("len"))
-				{
-					elem.setAttribute("len", QString::number(static_cast<int>(elem.attribute("len").toInt() * scaleFactor)));
-				}
-			}
-		};
-
-		QDomNodeList nodes = elementsByTagName("note");
-		scaleNodes(nodes, legacyToCurrent);
-		nodes = elementsByTagName("pattern");
-		scaleNodes(nodes, legacyToCurrent);
-		nodes = elementsByTagName("bbtco");
-		scaleNodes(nodes, legacyToCurrent);
-		nodes = elementsByTagName("sampletco");
-		scaleNodes(nodes, legacyToCurrent);
-		nodes = elementsByTagName("automationpattern");
-		scaleNodes(nodes, legacyToCurrent);
-		nodes = elementsByTagName("time");
-		scaleNodes(nodes, legacyToCurrent);
-	}
 
 	// Bump the file version (which should be the size of the upgrade methods vector)
 	m_fileVersion = UPGRADE_METHODS.size();
