@@ -2066,6 +2066,14 @@ void DataFile::upgrade_legacyTicks()
 		return;
 	}
 
+	const auto legacyTickUpgradeIndex = std::distance(
+		UPGRADE_METHODS.begin(),
+		std::find(UPGRADE_METHODS.begin(), UPGRADE_METHODS.end(), &DataFile::upgrade_legacyTicks));
+	if (m_fileVersion > static_cast<unsigned int>(legacyTickUpgradeIndex))
+	{
+		return;
+	}
+
 	const auto legacyToCurrent = static_cast<double>(DefaultTicksPerBar) / LegacyTicksPerBar;
 	const auto scaleNodes = [](QDomNodeList& nodes, double scaleFactor)
 	{
