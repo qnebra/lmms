@@ -2075,35 +2075,30 @@ void DataFile::upgrade_legacyTicks()
 	}
 
 	const auto legacyToCurrent = static_cast<double>(DefaultTicksPerBar) / LegacyTicksPerBar;
-	const auto scaleNodes = [](QDomNodeList& nodes, double scaleFactor)
+	const auto scaleLegacyTickAttribute = [legacyToCurrent](QDomElement& elem, const char* attributeName)
 	{
+		if (elem.isNull() || !elem.hasAttribute(attributeName)) { return; }
+		elem.setAttribute(attributeName,
+			QString::number(std::llround(elem.attribute(attributeName).toDouble() * legacyToCurrent)));
+	};
+	const auto scaleNodes = [&scaleLegacyTickAttribute](const char* tagName)
+	{
+		QDomNodeList nodes = elementsByTagName(tagName);
 		for (int i = 0; i < nodes.size(); ++i)
 		{
-			QDomElement elem = nodes.item(i).toElement();
-			if (elem.isNull()) { continue; }
-			if (elem.hasAttribute("pos"))
-			{
-				elem.setAttribute("pos", QString::number(static_cast<int>(elem.attribute("pos").toInt() * scaleFactor)));
-			}
-			if (elem.hasAttribute("len"))
-			{
-				elem.setAttribute("len", QString::number(static_cast<int>(elem.attribute("len").toInt() * scaleFactor)));
-			}
+			auto elem = nodes.item(i).toElement();
+			scaleLegacyTickAttribute(elem, "pos");
+			scaleLegacyTickAttribute(elem, "len");
+			scaleLegacyTickAttribute(elem, "off");
 		}
 	};
 
-	QDomNodeList nodes = elementsByTagName("note");
-	scaleNodes(nodes, legacyToCurrent);
-	nodes = elementsByTagName("midiclip");
-	scaleNodes(nodes, legacyToCurrent);
-	nodes = elementsByTagName("patternclip");
-	scaleNodes(nodes, legacyToCurrent);
-	nodes = elementsByTagName("sampleclip");
-	scaleNodes(nodes, legacyToCurrent);
-	nodes = elementsByTagName("automationclip");
-	scaleNodes(nodes, legacyToCurrent);
-	nodes = elementsByTagName("time");
-	scaleNodes(nodes, legacyToCurrent);
+	scaleNodes("note");
+	scaleNodes("midiclip");
+	scaleNodes("patternclip");
+	scaleNodes("sampleclip");
+	scaleNodes("automationclip");
+	scaleNodes("time");
 }
 
 void DataFile::upgrade()
