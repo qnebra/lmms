@@ -27,6 +27,7 @@
 #include "Engine.h"
 #include "Song.h"
 #include "MidiPort.h"
+#include "TimePos.h"
 
 
 #ifdef LMMS_HAVE_ALSA
@@ -92,7 +93,7 @@ MidiAlsaSeq::MidiAlsaSeq() :
 	snd_seq_queue_tempo_malloc( &tempo );
 	snd_seq_queue_tempo_set_tempo( tempo, 6000000 /
 					Engine::getSong()->getTempo() );
-	snd_seq_queue_tempo_set_ppq( tempo, 16 );
+	snd_seq_queue_tempo_set_ppq( tempo, DefaultTicksPerQuarter );
 	snd_seq_set_queue_tempo( m_seqHandle, m_queueID, tempo );
 	snd_seq_queue_tempo_free( tempo );
 

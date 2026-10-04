@@ -2070,9 +2070,8 @@ void DataFile::upgrade()
 	);
 
 	// Compatibility migration for legacy projects saved with the old 192-tick-per-bar default.
-	// Old saved positions and lengths are still in the legacy resolution, so rescale them to
-	// the current 3840-tick-per-bar grid before project content is restored.
-	if (type() == Type::SongProject || type() == Type::SongProjectTemplate)
+	// Only rescale older files; current projects are already in the 3840-tick-per-bar grid.
+	if ((type() == Type::SongProject || type() == Type::SongProjectTemplate) && m_fileVersion < UPGRADE_METHODS.size())
 	{
 		const auto legacyToCurrent = static_cast<double>(DefaultTicksPerBar) / LegacyTicksPerBar;
 		const auto scaleNodes = [](QDomNodeList& nodes, double scaleFactor)

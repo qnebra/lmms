@@ -40,7 +40,8 @@ constexpr int LegacyTicksPerQuarter = LegacyTicksPerBar / 4;
 constexpr int DefaultTicksPerBar = 3840;
 constexpr int DefaultTicksPerQuarter = DefaultTicksPerBar / 4;
 constexpr int DefaultStepsPerBar = 16;
-constexpr int DefaultBeatsPerBar = DefaultTicksPerBar / DefaultStepsPerBar;
+constexpr int DefaultBeatsPerBar = 4;
+constexpr int DefaultTicksPerStep = DefaultTicksPerBar / DefaultStepsPerBar;
 
 
 class MeterModel;
@@ -130,7 +131,7 @@ public:
 	static tick_t ticksPerBar() { return s_ticksPerBar; }
 	static tick_t ticksPerBar(const TimeSig& sig) { return DefaultTicksPerBar * sig.numerator() / sig.denominator(); }
 
-	static int stepsPerBar() { return std::max(1, ticksPerBar() / DefaultBeatsPerBar); }
+	static int stepsPerBar() { return std::max(1, ticksPerBar() / DefaultTicksPerStep); }
 	static void setTicksPerBar(tick_t ticks) { s_ticksPerBar = ticks; }
 	static TimePos stepPosition(int step) { return step * ticksPerBar() / stepsPerBar(); }
 

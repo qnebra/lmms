@@ -81,6 +81,15 @@ private slots:
 		QVERIFY(!positionJumpedReceived);
 	}
 
+	void DefaultTimebaseTests()
+	{
+		using namespace lmms;
+		QCOMPARE(LegacyTicksPerBar, 192);
+		QCOMPARE(LegacyTicksPerQuarter, 48);
+		QCOMPARE(DefaultTicksPerBar, 3840);
+		QCOMPARE(DefaultTicksPerQuarter, 960);
+	}
+
 	void ElapsedTimeTests()
 	{
 		using namespace lmms;
