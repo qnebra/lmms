@@ -2069,6 +2069,43 @@ void DataFile::upgrade()
 		}
 	);
 
+	// Compatibility migration for legacy projects saved with the old 192-tick-per-bar default.
+	// Old saved positions and lengths are still in the legacy resolution, so rescale them to
+	// the current 3840-tick-per-bar grid before project content is restored.
+	if (type() == Type::SongProject || type() == Type::SongProjectTemplate)
+	{
+		const auto legacyToCurrent = static_cast<double>(DefaultTicksPerBar) / LegacyTicksPerBar;
+		const auto scaleNodes = [](QDomNodeList& nodes, double scaleFactor)
+		{
+			for (int i = 0; i < nodes.size(); ++i)
+			{
+				QDomElement elem = nodes.item(i).toElement();
+				if (elem.isNull()) { continue; }
+				if (elem.hasAttribute("pos"))
+				{
+					elem.setAttribute("pos", QString::number(static_cast<int>(elem.attribute("pos").toInt() * scaleFactor)));
+				}
+				if (elem.hasAttribute("len"))
+				{
+					elem.setAttribute("len", QString::number(static_cast<int>(elem.attribute("len").toInt() * scaleFactor)));
+				}
+			}
+		};
+
+		QDomNodeList nodes = elementsByTagName("note");
+		scaleNodes(nodes, legacyToCurrent);
+		nodes = elementsByTagName("pattern");
+		scaleNodes(nodes, legacyToCurrent);
+		nodes = elementsByTagName("bbtco");
+		scaleNodes(nodes, legacyToCurrent);
+		nodes = elementsByTagName("sampletco");
+		scaleNodes(nodes, legacyToCurrent);
+		nodes = elementsByTagName("automationpattern");
+		scaleNodes(nodes, legacyToCurrent);
+		nodes = elementsByTagName("time");
+		scaleNodes(nodes, legacyToCurrent);
+	}
+
 	// Bump the file version (which should be the size of the upgrade methods vector)
 	m_fileVersion = UPGRADE_METHODS.size();
 

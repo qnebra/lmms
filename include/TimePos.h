@@ -36,7 +36,9 @@ namespace lmms
 
 // note: a bar was erroneously called "tact" in older versions of LMMS
 constexpr int LegacyTicksPerBar = 192;
+constexpr int LegacyTicksPerQuarter = LegacyTicksPerBar / 4;
 constexpr int DefaultTicksPerBar = 3840;
+constexpr int DefaultTicksPerQuarter = DefaultTicksPerBar / 4;
 constexpr int DefaultStepsPerBar = 16;
 constexpr int DefaultBeatsPerBar = DefaultTicksPerBar / DefaultStepsPerBar;
 
