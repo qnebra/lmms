@@ -31,6 +31,7 @@
 
 #include "AudioEngine.h"
 #include "Engine.h"
+#include "TimePos.h"
 
 
 namespace lmms
@@ -64,10 +65,12 @@ void VstSyncController::setAbsolutePosition(double ticks)
 {
 	if (!m_syncData) { return; }
 
+	const double ticksPerQuarter = static_cast<double>(TimePos::ticksPerBar()) / 4.0;
+
 #ifdef VST_SNC_LATENCY
-	m_syncData->ppqPos = ((ticks + 0) / 48.0) - m_syncData->latency;
+	m_syncData->ppqPos = (ticks / ticksPerQuarter) - m_syncData->latency;
 #else
-	m_syncData->ppqPos = ((ticks + 0) / 48.0);
+	m_syncData->ppqPos = (ticks / ticksPerQuarter);
 #endif
 }
 
@@ -110,9 +113,10 @@ void VstSyncController::startCycle(int startTick, int endTick)
 {
 	if (!m_syncData) { return; }
 
+	const float ticksPerQuarter = static_cast<float>(TimePos::ticksPerBar()) / 4.0f;
 	m_syncData->isCycle = true;
-	m_syncData->cycleStart = startTick / (float)48;
-	m_syncData->cycleEnd = endTick / (float)48;
+	m_syncData->cycleStart = startTick / ticksPerQuarter;
+	m_syncData->cycleEnd = endTick / ticksPerQuarter;
 }
 
 
