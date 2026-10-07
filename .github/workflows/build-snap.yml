@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - master
-  pull_request:
 
 permissions:
   contents: read
@@ -25,8 +24,8 @@ jobs:
       - name: Build snap
         uses: snapcore/action-build@b391f430cb2650fd359ed4d2cfe88b2c481800e0
         with:
-          snapcraft-args: --destructive-mode --build-for amd64 --build-id ${GITHUB_RUN_ID}
-          path: snap
+          snapcraft-args: --destructive-mode --build-for amd64
+          path: .
 
       - name: Upload snap artifact
         uses: actions/upload-artifact@v4

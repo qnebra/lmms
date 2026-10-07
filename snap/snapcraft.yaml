@@ -10,15 +10,15 @@ confinement: classic
 grade: stable
 
 platforms:
-amd64:
-  - build-on: [amd64]
+  amd64:
+    build-on: [amd64]
     build-for: [amd64]
 
 apps:
   lmms:
     command: usr/bin/lmms
     environment:
-      PATH: /usr/bin:$PATH
+      PATH: $SNAP/usr/bin:/usr/bin:$PATH
       WINE: /usr/bin/wine
       WINEPREFIX: $HOME/.wine
       XDG_DATA_DIRS: $HOME/.local/share:/usr/share:$XDG_DATA_DIRS
@@ -31,16 +31,16 @@ parts:
     cmake-generator: Ninja
     override-build: |
       set -eux
-      git clone --depth=1 https://github.com/fltk/fltk.git "$CRAFT_STAGE/fltk"
-      cmake -S "$CRAFT_STAGE/fltk" -B "$CRAFT_STAGE/fltk/build" \
+      git clone --depth=1 https://github.com/fltk/fltk.git "$CRAFT_PART_BUILD/fltk"
+      cmake -S "$CRAFT_PART_BUILD/fltk" -B "$CRAFT_PART_BUILD/fltk/build" \
         -DFLTK_BUILD_SHARED_LIBS=ON \
         -DFLTK_BACKEND_WAYLAND=ON \
         -DFLTK_USE_LIBDECOR_GTK=OFF \
         -DFLTK_BUILD_TEST=OFF \
         -DFLTK_BUILD_GL=OFF
-      cmake --build "$CRAFT_STAGE/fltk/build"
-      cmake --install "$CRAFT_STAGE/fltk/build" --prefix /usr
-      craftctl default
+      cmake --build "$CRAFT_PART_BUILD/fltk/build"
+      cmake --install "$CRAFT_PART_BUILD/fltk/build" --prefix "$CRAFT_STAGE/usr"
+      craftctl default -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_INSTALL_PREFIX=/usr -D CMAKE_PREFIX_PATH="$CRAFT_STAGE/usr" -D USE_WERROR=OFF
     cmake-parameters:
       - -DCMAKE_BUILD_TYPE=RelWithDebInfo
       - -DCMAKE_INSTALL_PREFIX=/usr
