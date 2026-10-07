@@ -1,0 +1,41 @@
+name: Build LMMS Snap
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  build-snap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Install snapcraft
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends snapd
+          sudo snap install snapcraft --classic
+          snapcraft --version
+
+      - name: Build snap
+        run: |
+          snapcraft --destructive-mode
+
+      - name: List built artifact
+        run: ls -lh *.snap
+
+      - name: Upload snap artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lmms-snap
+          path: "*.snap"
+          if-no-files-found: error

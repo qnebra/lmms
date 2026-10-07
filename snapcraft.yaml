@@ -1,0 +1,126 @@
+name: lmms
+version: "edge"
+summary: LMMS - Linux MultiMedia Studio
+description: |
+  LMMS is a cross-platform digital audio workstation for music production,
+  recording, sequencing, mixing, and VST support.
+
+base: core24
+confinement: classic
+grade: devel
+
+architectures:
+  - build-on: [amd64]
+
+apps:
+  lmms:
+    command: usr/bin/lmms
+    environment:
+      PATH: /usr/bin:$SNAP/usr/bin:$PATH
+      WINE: /usr/bin/wine
+      WINEPREFIX: $HOME/.wine
+      XDG_DATA_DIRS: $SNAP/usr/share:$XDG_DATA_DIRS
+      LD_LIBRARY_PATH: $SNAP/lib:$SNAP/usr/lib:$LD_LIBRARY_PATH
+
+parts:
+  lmms:
+    plugin: cmake
+    source: https://github.com/qnebra/lmms.git
+    source-type: git
+    source-branch: master
+    source-depth: 1
+    cmake-generator: Ninja
+    cmake-parameters:
+      - -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - -DCMAKE_INSTALL_PREFIX=/usr
+      - -DUSE_WERROR=OFF
+    build-packages:
+      - build-essential
+      - cmake
+      - ninja-build
+      - pkg-config
+      - git
+      - qtbase5-dev
+      - qtbase5-dev-tools
+      - qttools5-dev
+      - qttools5-dev-tools
+      - libqt5svg5-dev
+      - libfftw3-dev
+      - libfluidsynth-dev
+      - libasound2-dev
+      - libjack-jackd2-dev
+      - libsndfile1-dev
+      - libsdl2-dev
+      - libsamplerate0-dev
+      - liblilv-dev
+      - libsuil-dev
+      - lv2-dev
+      - libgig-dev
+      - libstk-dev
+      - portaudio19-dev
+      - libpulse-dev
+      - libx11-dev
+      - libxext-dev
+      - libxcb1-dev
+      - libxcb-keysyms1-dev
+      - libxcb-image0-dev
+      - libxcb-randr0-dev
+      - libxcb-render-util0-dev
+      - libxcb-shape0-dev
+      - libxcb-sync0-dev
+      - libxcb-xfixes0-dev
+      - libxcb-xinerama0-dev
+      - libxcb-xkb-dev
+      - libxcb-cursor-dev
+      - libxcb-icccm4-dev
+      - libxcb-util-dev
+      - libfontconfig1-dev
+      - libfreetype6-dev
+      - libgl1-mesa-dev
+      - libglu1-mesa-dev
+      - libpng-dev
+      - zlib1g-dev
+      - libsm-dev
+      - libice-dev
+    stage-packages:
+      - libc6
+      - libasound2
+      - libfftw3-3
+      - libfluidsynth1
+      - libgig7
+      - libjack-jackd2-0
+      - liblilv-0-0
+      - libsuil-0-0
+      - libsndfile1
+      - libsamplerate0
+      - libstk0
+      - libportaudio2
+      - libpulse0
+      - libqt5svg5
+      - libqt5widgets5
+      - libqt5gui5
+      - libqt5network5
+      - libqt5xml5
+      - libqt5printsupport5
+      - libqt5dbus5
+      - libqt5core5a
+      - libqt5concurrent5
+      - libqt5x11extras5
+      - libx11-6
+      - libxext6
+      - libxrender1
+      - libxrandr2
+      - libfontconfig1
+      - libfreetype6
+      - libopenal1
+      - libvorbis0a
+      - libvorbisenc2
+      - libogg0
+      - libflac12
+      - libmad0
+      - libmp3lame0
+      - libpulse-mainloop-glib0
+      - libglib2.0-0
+      - libglu1-mesa
+      - libsm6
+      - libice6
