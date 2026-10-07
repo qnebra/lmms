@@ -20,8 +20,8 @@ apps:
     environment:
       PATH: $SNAP/usr/bin:/usr/bin:$PATH
       WINE: /usr/bin/wine
-      WINEPREFIX: $HOME/.wine
-      XDG_DATA_DIRS: $HOME/.local/share:/usr/share:$XDG_DATA_DIRS
+      WINEPREFIX: $SNAP_REAL_HOME/.wine
+      XDG_DATA_DIRS: $SNAP_REAL_HOME/.local/share:/usr/share:$SNAP/usr/share${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}
 
 parts:
   lmms:
@@ -40,7 +40,7 @@ parts:
         -DFLTK_BUILD_GL=OFF
       cmake --build "$CRAFT_PART_BUILD/fltk/build"
       cmake --install "$CRAFT_PART_BUILD/fltk/build" --prefix "$CRAFT_STAGE/usr"
-      craftctl default -D CMAKE_BUILD_TYPE=RelWithDebInfo -D CMAKE_INSTALL_PREFIX=/usr -D CMAKE_PREFIX_PATH="$CRAFT_STAGE/usr" -D USE_WERROR=OFF
+      craftctl default -D CMAKE_PREFIX_PATH="$CRAFT_STAGE/usr"
     cmake-parameters:
       - -DCMAKE_BUILD_TYPE=RelWithDebInfo
       - -DCMAKE_INSTALL_PREFIX=/usr

@@ -22,6 +22,7 @@ jobs:
           submodules: recursive
 
       - name: Build snap
+        id: snapcraft
         uses: snapcore/action-build@b391f430cb2650fd359ed4d2cfe88b2c481800e0
         with:
           snapcraft-args: --destructive-mode --build-for amd64
@@ -31,5 +32,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lmms-snap
-          path: "*.snap"
+          path: ${{ steps.snapcraft.outputs.snap }}
           if-no-files-found: error
