@@ -1,35 +1,45 @@
 name: lmms
-version: "edge"
+version: git
 summary: LMMS - Linux MultiMedia Studio
 description: |
   LMMS is a cross-platform digital audio workstation for music production,
-  recording, sequencing, mixing, and VST support.
+  sequencing, mixing, and VST-based workflows.
 
 base: core24
 confinement: classic
-grade: devel
+grade: stable
 
 platforms:
   - build-on: [amd64]
+    build-for: [amd64]
 
 apps:
   lmms:
     command: usr/bin/lmms
     environment:
-      PATH: /usr/bin:$SNAP/usr/bin:$PATH
+      PATH: /usr/bin:$PATH
       WINE: /usr/bin/wine
       WINEPREFIX: $HOME/.wine
-      XDG_DATA_DIRS: $SNAP/usr/share:$XDG_DATA_DIRS
-      LD_LIBRARY_PATH: $SNAP/lib:$SNAP/usr/lib:$LD_LIBRARY_PATH
+      XDG_DATA_DIRS: $HOME/.local/share:/usr/share:$XDG_DATA_DIRS
 
 parts:
   lmms:
     plugin: cmake
-    source: https://github.com/qnebra/lmms.git
-    source-type: git
-    source-branch: master
-    source-depth: 1
+    source: .
+    source-type: local
     cmake-generator: Ninja
+    override-build: |
+      set -eux
+      git clone --depth=1 https://github.com/fltk/fltk.git "$CRAFT_STAGE/fltk"
+      cmake -S "$CRAFT_STAGE/fltk" -B "$CRAFT_STAGE/fltk/build" \
+        -DFLTK_BUILD_SHARED_LIBS=ON \
+        -DFLTK_BACKEND_WAYLAND=ON \
+        -DFLTK_USE_LIBDECOR_GTK=OFF \
+        -DFLTK_BUILD_TEST=OFF \
+        -DFLTK_BUILD_GL=OFF
+      cmake --build "$CRAFT_STAGE/fltk/build"
+      cmake --install "$CRAFT_STAGE/fltk/build" --prefix /usr
+      craftctl default
     cmake-parameters:
       - -DCMAKE_BUILD_TYPE=RelWithDebInfo
       - -DCMAKE_INSTALL_PREFIX=/usr
@@ -86,26 +96,26 @@ parts:
       - libc6
       - libasound2
       - libfftw3-3
-      - libfluidsynth1
+      - libfluidsynth3
       - libgig7
       - libjack-jackd2-0
       - liblilv-0-0
       - libsuil-0-0
       - libsndfile1
       - libsamplerate0
-      - libstk0
+      - libstk0t64
       - libportaudio2
       - libpulse0
       - libqt5svg5
-      - libqt5widgets5
-      - libqt5gui5
-      - libqt5network5
-      - libqt5xml5
-      - libqt5printsupport5
-      - libqt5dbus5
-      - libqt5core5a
-      - libqt5concurrent5
-      - libqt5x11extras5
+      - libqt5widgets5t64
+      - libqt5gui5t64
+      - libqt5network5t64
+      - libqt5xml5t64
+      - libqt5printsupport5t64
+      - libqt5dbus5t64
+      - libqt5core5t64
+      - libqt5concurrent5t64
+      - libqt5x11extras5t64
       - libx11-6
       - libxext6
       - libxrender1
@@ -116,7 +126,7 @@ parts:
       - libvorbis0a
       - libvorbisenc2
       - libogg0
-      - libflac12
+      - libflac12t64
       - libmad0
       - libmp3lame0
       - libpulse-mainloop-glib0

@@ -7,6 +7,9 @@ on:
       - master
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build-snap:
     runs-on: ubuntu-24.04
@@ -19,19 +22,10 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Install snapcraft
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y --no-install-recommends snapd
-          sudo snap install snapcraft --classic
-          snapcraft --version
-
       - name: Build snap
-        run: |
-          snapcraft --destructive-mode
-
-      - name: List built artifact
-        run: ls -lh *.snap
+        uses: snapcore/action-build@b391f430cb2650fd359ed4d2cfe88b2c481800e0
+        with:
+          snapcraft-args: --destructive-mode
 
       - name: Upload snap artifact
         uses: actions/upload-artifact@v4
