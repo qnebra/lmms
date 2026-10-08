@@ -84,7 +84,8 @@ const std::vector<DataFile::UpgradeMethod> DataFile::UPGRADE_METHODS = {
 	&DataFile::upgrade_defaultTripleOscillatorHQ,
 	&DataFile::upgrade_mixerRename      ,   &DataFile::upgrade_bbTcoRename,
 	&DataFile::upgrade_sampleAndHold    ,   &DataFile::upgrade_midiCCIndexing,
-	&DataFile::upgrade_loopsRename      ,   &DataFile::upgrade_noteTypes,
+	&DataFile::upgrade_loopsRename      ,   &DataFile::upgrade_legacyTicks,
+	&DataFile::upgrade_noteTypes,
 	&DataFile::upgrade_fixCMTDelays     ,   &DataFile::upgrade_fixBassLoopsTypo,
 	&DataFile::findProblematicLadspaPlugins,
 	&DataFile::upgrade_noHiddenAutomationTracks
@@ -2056,6 +2057,48 @@ void DataFile::upgrade_fixBassLoopsTypo()
 	};
 
 	mapSrcAttributeInElementsWithResources(replacementMap);
+}
+
+void DataFile::upgrade_legacyTicks()
+{
+	if ((type() != Type::SongProject && type() != Type::SongProjectTemplate))
+	{
+		return;
+	}
+
+	const auto legacyTickUpgradeIndex = std::distance(
+		UPGRADE_METHODS.begin(),
+		std::find(UPGRADE_METHODS.begin(), UPGRADE_METHODS.end(), &DataFile::upgrade_legacyTicks));
+	if (m_fileVersion > static_cast<unsigned int>(legacyTickUpgradeIndex))
+	{
+		return;
+	}
+
+	const auto legacyToCurrent = static_cast<double>(DefaultTicksPerBar) / LegacyTicksPerBar;
+	const auto scaleLegacyTickAttribute = [legacyToCurrent](QDomElement& elem, const char* attributeName)
+	{
+		if (elem.isNull() || !elem.hasAttribute(attributeName)) { return; }
+		elem.setAttribute(attributeName,
+			QString::number(std::llround(elem.attribute(attributeName).toDouble() * legacyToCurrent)));
+	};
+	const auto scaleNodes = [&scaleLegacyTickAttribute](const char* tagName)
+	{
+		QDomNodeList nodes = elementsByTagName(tagName);
+		for (int i = 0; i < nodes.size(); ++i)
+		{
+			auto elem = nodes.item(i).toElement();
+			scaleLegacyTickAttribute(elem, "pos");
+			scaleLegacyTickAttribute(elem, "len");
+			scaleLegacyTickAttribute(elem, "off");
+		}
+	};
+
+	scaleNodes("note");
+	scaleNodes("midiclip");
+	scaleNodes("patternclip");
+	scaleNodes("sampleclip");
+	scaleNodes("automationclip");
+	scaleNodes("time");
 }
 
 void DataFile::upgrade()

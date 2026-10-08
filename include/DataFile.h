@@ -158,6 +158,7 @@ private:
 	void upgrade_fixCMTDelays();
 	void upgrade_fixBassLoopsTypo();
 	void findProblematicLadspaPlugins();
+	void upgrade_legacyTicks();
 	void upgrade_noHiddenAutomationTracks();
 
 	// List of all upgrade methods
