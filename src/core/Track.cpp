@@ -29,6 +29,7 @@
 
 #include "Track.h"
 
+#include <algorithm>
 #include <QDomElement>
 #include <QVariant>
 
@@ -285,7 +286,10 @@ void Track::loadSettings(const QDomElement& element)
 
 Clip * Track::addClip( Clip * clip )
 {
-	m_clips.push_back( clip );
+	// Insert in sorted position to keep m_clips ordered by startPosition().
+	// This allows getClipsInRange() to use binary search instead of a full scan.
+	auto it = std::lower_bound(m_clips.begin(), m_clips.end(), clip, Clip::comparePosition);
+	m_clips.insert(it, clip);
 
 	emit clipAdded( clip );
 
@@ -355,16 +359,29 @@ int Track::getClipNum( const Clip * clip )
 
 
 
+void Track::resortClips()
+{
+	std::stable_sort(m_clips.begin(), m_clips.end(), Clip::comparePosition);
+}
+
+
+
+
 void Track::getClipsInRange( clipVector & clipV, const TimePos & start,
 							const TimePos & end )
 {
-	for( Clip* clip : m_clips )
+	// m_clips is kept sorted by startPosition() (maintained by addClip and resortClips).
+	// Use upper_bound to find the first clip whose start is strictly after 'end',
+	// then only examine clips up to that point.  This reduces the scan from O(n)
+	// to O(log n + k) where k is the number of clips that actually overlap.
+	auto rangeEnd = std::upper_bound(m_clips.begin(), m_clips.end(), end,
+		[](const TimePos & t, const Clip * c) { return t < c->startPosition(); });
+
+	for (auto it = m_clips.begin(); it != rangeEnd; ++it)
 	{
-		int s = clip->startPosition();
-		int e = clip->endPosition();
-		if( ( s <= end ) && ( e >= start ) )
+		Clip* clip = *it;
+		if (clip->endPosition() >= start)
 		{
-			// Clip is within given range
 			// Insert sorted by Clip's position
 			clipV.insert(std::upper_bound(clipV.begin(), clipV.end(), clip, Clip::comparePosition),
 						clip);
@@ -377,12 +394,13 @@ void Track::getClipsInRange( clipVector & clipV, const TimePos & start,
 
 void Track::swapPositionOfClips( int clipNum1, int clipNum2 )
 {
-	qSwap( m_clips[clipNum1], m_clips[clipNum2] );
-
-	const TimePos pos = m_clips[clipNum1]->startPosition();
-
-	m_clips[clipNum1]->movePosition( m_clips[clipNum2]->startPosition() );
-	m_clips[clipNum2]->movePosition( pos );
+	// Cache pointers before any position changes because movePosition() calls
+	// resortClips(), which invalidates index-based access to m_clips.
+	Clip * clip1 = m_clips[clipNum1];
+	Clip * clip2 = m_clips[clipNum2];
+	const TimePos pos1 = clip1->startPosition();
+	clip1->movePosition(clip2->startPosition());
+	clip2->movePosition(pos1);
 }
 
 

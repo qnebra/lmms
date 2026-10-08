@@ -26,6 +26,7 @@
 #define LMMS_AUDIO_ENGINE_H
 
 #include <mutex>
+#include <unordered_set>
 
 #include <QThread>
 #include <samplerate.h>
@@ -393,7 +394,8 @@ private:
 	PlayHandleList m_playHandles;
 	// place where new playhandles are added temporarily
 	LocklessList<PlayHandle *> m_newPlayHandles;
-	ConstPlayHandleList m_playHandlesToRemove;
+	// handles queued for deferred removal (unordered for O(1) lookup)
+	std::unordered_set<const PlayHandle *> m_playHandlesToRemove;
 
 	float m_masterGain;
 

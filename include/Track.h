@@ -144,7 +144,11 @@ public:
 	//! @brief Remove a given Clip from this track
 	//! @param clip The Clip to remove from this track.
 	void removeClip(Clip* clip);
-	// -------------------------------------------------------
+
+	//! @brief Re-sort the internal clip vector by start position.
+	//! Must be called after any operation that changes a clip's start position
+	//! without going through addClip (e.g. direct movePosition calls).
+	void resortClips();
 
 	//! @brief Remove all Clips from this track
 	void deleteClips();
