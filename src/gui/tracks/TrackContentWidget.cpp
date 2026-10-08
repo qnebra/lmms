@@ -24,6 +24,8 @@
 
 #include "TrackContentWidget.h"
 
+#include <cmath>
+
 #include <QApplication>
 #include <QContextMenuEvent>
 #include <QMenu>
@@ -229,7 +231,7 @@ void TrackContentWidget::changePosition( const TimePos & newPos )
 	{
 		Clip* clip = clipView->getClip();
 
-		const auto xPos = static_cast<int>((clip->startPosition() - begin) * ppb / TimePos::ticksPerBar());
+		const auto xPos = static_cast<int>(std::round((clip->startPosition() - begin) * ppb / TimePos::ticksPerBar()));
 		clipView->move(xPos, clipView->y());
 		if (!clipView->isVisible())
 		{
