@@ -34,6 +34,7 @@
 #include "endian_handling.h"
 #include "LcdSpinBox.h"
 #include "AudioEngine.h"
+#include "FloatToInt16Ditherer.h"
 
 #include "ConfigManager.h"
 
@@ -132,6 +133,7 @@ void AudioSndio::run()
 {
 	const auto framesPerAudioBuffer = audioEngine()->framesPerAudioBuffer();
 	const auto samplesPerAudioBuffer = framesPerAudioBuffer * channels();
+	const auto& ditherer = floatToInt16Ditherer();
 	auto fbuf = std::vector<sample_t>(samplesPerAudioBuffer);
 	auto ibuf = std::vector<int_sample_t>(samplesPerAudioBuffer);
 
@@ -140,13 +142,13 @@ void AudioSndio::run()
 		audioEngine()->renderNextBuffer({fbuf.data(), channels(), framesPerAudioBuffer});
 
 		// Sndio doesn't speak float, so convert samples to signed int.
-		// While convertToS16() exists, it is intentionally not used
-		// here. There is no need to convert endian-ness since sndio was
-		// initialized with SIO_LE_NATIVE, and there's no reason to
-		// also convert to SampleFrame.
+		// convertToS16() is intentionally not used here because there is
+		// no need to convert endian-ness since sndio was initialized with
+		// SIO_LE_NATIVE, and there's no reason to also convert to
+		// SampleFrame.
 		for (auto i = 0u; i < samplesPerAudioBuffer; ++i)
 		{
-			ibuf[i] = static_cast<int_sample_t>(AudioEngine::clip(fbuf[i]) * OUTPUT_SAMPLE_MULTIPLIER);
+			ibuf[i] = ditherer.convert(fbuf[i]);
 		}
 
 		sio_write(m_hdl, ibuf.data(), ibuf.size() * sizeof(int_sample_t));
