@@ -32,6 +32,7 @@
 namespace lmms
 {
 
+class LocklessAllocator;
 class SampleFrame;
 
 class LMMS_EXPORT BufferManager
@@ -43,6 +44,7 @@ public:
 
 private:
 	static f_cnt_t s_framesPerPeriod;
+	static LocklessAllocator* s_pool;
 };
 
 

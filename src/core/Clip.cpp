@@ -94,6 +94,10 @@ void Clip::movePosition( const TimePos & pos )
 	{
 		Engine::audioEngine()->requestChangeInModel();
 		m_startPosition = newPos;
+		if (getTrack())
+		{
+			getTrack()->resortClips();
+		}
 		Engine::audioEngine()->doneChangeInModel();
 		Engine::getSong()->updateLength();
 		emit positionChanged();
