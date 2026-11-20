@@ -26,6 +26,8 @@
 
 #ifdef LMMS_HAVE_WINMM
 
+#include <QMutexLocker>
+
 
 namespace lmms
 {
@@ -36,9 +38,21 @@ MidiWinMM::MidiWinMM() :
 	m_inputDevices(),
 	m_outputDevices(),
 	m_inputSubs(),
-	m_outputSubs()
+	m_outputSubs(),
+	m_devicesMutex(),
+	m_deviceListUpdateTimer( this ),
+	m_lastInputDeviceCount(0),
+	m_lastOutputDeviceCount(0)
 {
 	openDevices();
+	
+	// Initialize device counts for hot-plug detection
+	m_lastInputDeviceCount = midiInGetNumDevs();
+	m_lastOutputDeviceCount = midiOutGetNumDevs();
+	
+	// Start timer to check for device changes every 2 seconds
+	connect(&m_deviceListUpdateTimer, SIGNAL(timeout()), this, SLOT(checkForDeviceChanges()));
+	m_deviceListUpdateTimer.start(2000);
 }
 
 
@@ -58,25 +72,35 @@ void MidiWinMM::processOutEvent( const MidiEvent& event, const TimePos& time, co
 				( ( event.param( 0 ) & 0xff ) << 8 ) +
 				( ( event.param( 1 ) & 0xff ) << 16 );
 
-	QStringList outDevs;
-	for( SubMap::ConstIterator it = m_outputSubs.begin(); it != m_outputSubs.end(); ++it )
+	QList<HMIDIOUT> outHandles;
 	{
-		for( MidiPortList::ConstIterator jt = it.value().begin(); jt != it.value().end(); ++jt )
+		QMutexLocker locker( &m_devicesMutex );
+
+		QStringList outDevs;
+		for( SubMap::ConstIterator it = m_outputSubs.begin(); it != m_outputSubs.end(); ++it )
 		{
-			if( *jt == port )
+			for( MidiPortList::ConstIterator jt = it.value().begin(); jt != it.value().end(); ++jt )
 			{
-				outDevs += it.key();
-				break;
+				if( *jt == port )
+				{
+					outDevs += it.key();
+					break;
+				}
+			}
+		}
+
+		for( QMap<HMIDIOUT, QString>::Iterator it = m_outputDevices.begin(); it != m_outputDevices.end(); ++it )
+		{
+			if( outDevs.contains( *it ) )
+			{
+				outHandles.push_back( it.key() );
 			}
 		}
 	}
 
-	for( QMap<HMIDIOUT, QString>::Iterator it = m_outputDevices.begin(); it != m_outputDevices.end(); ++it )
+	for( QList<HMIDIOUT>::ConstIterator it = outHandles.begin(); it != outHandles.end(); ++it )
 	{
-		if( outDevs.contains( *it ) )
-		{
-			midiOutShortMsg( it.key(), shortMsg );
-		}
+		midiOutShortMsg( *it, shortMsg );
 	}
 }
 
@@ -85,6 +109,8 @@ void MidiWinMM::processOutEvent( const MidiEvent& event, const TimePos& time, co
 
 void MidiWinMM::applyPortMode( MidiPort* port )
 {
+	QMutexLocker locker( &m_devicesMutex );
+
 	// make sure no subscriptions exist which are not possible with
 	// current port-mode
 	if( !port->isInputEnabled() )
@@ -109,6 +135,8 @@ void MidiWinMM::applyPortMode( MidiPort* port )
 
 void MidiWinMM::removePort( MidiPort* port )
 {
+	QMutexLocker locker( &m_devicesMutex );
+
 	for( SubMap::Iterator it = m_inputSubs.begin(); it != m_inputSubs.end(); ++it )
 	{
 		it.value().removeAll( port );
@@ -127,6 +155,8 @@ void MidiWinMM::removePort( MidiPort* port )
 
 QString MidiWinMM::sourcePortName( const MidiEvent& event ) const
 {
+	QMutexLocker locker( &m_devicesMutex );
+
 	if( event.sourcePort() )
 	{
 		return m_inputDevices.value( *static_cast<const HMIDIIN *>( event.sourcePort() ) );
@@ -140,6 +170,8 @@ QString MidiWinMM::sourcePortName( const MidiEvent& event ) const
 
 void MidiWinMM::subscribeReadablePort( MidiPort* port, const QString& dest, bool subscribe )
 {
+	QMutexLocker locker( &m_devicesMutex );
+
 	if( subscribe && port->isInputEnabled() == false )
 	{
 		qWarning( "port %s can't be (un)subscribed!\n", port->displayName().toLatin1().constData() );
@@ -158,6 +190,8 @@ void MidiWinMM::subscribeReadablePort( MidiPort* port, const QString& dest, bool
 
 void MidiWinMM::subscribeWritablePort( MidiPort* port, const QString& dest, bool subscribe )
 {
+	QMutexLocker locker( &m_devicesMutex );
+
 	if( subscribe && port->isOutputEnabled() == false )
 	{
 		qWarning( "port %s can't be (un)subscribed!\n", port->displayName().toLatin1().constData() );
@@ -187,9 +221,15 @@ void WINAPI CALLBACK MidiWinMM::inputCallback( HMIDIIN hm, UINT msg, DWORD_PTR i
 
 void MidiWinMM::handleInputEvent( HMIDIIN hm, DWORD ev )
 {
+	if( !m_devicesMutex.tryLock() )
+	{
+		return;
+	}
+
 	const int cmd = ev & 0xff;
 	if( cmd == MidiActiveSensing )
 	{
+		m_devicesMutex.unlock();
 		return;
 	}
 	const int par1 = ( ev >> 8 ) & 0xff;
@@ -200,10 +240,12 @@ void MidiWinMM::handleInputEvent( HMIDIIN hm, DWORD ev )
 	const QString d = m_inputDevices.value( hm );
 	if( d.isEmpty() || !m_inputSubs.contains( d ) )
 	{
+		m_devicesMutex.unlock();
 		return;
 	}
 
-	const MidiPortList & l = m_inputSubs[d];
+	const MidiPortList l = m_inputSubs[d];
+	m_devicesMutex.unlock();
 	for (MidiPortList::ConstIterator it = l.begin(); it != l.end(); ++it)
 	{
 		switch (cmdtype)
@@ -233,6 +275,8 @@ void MidiWinMM::handleInputEvent( HMIDIIN hm, DWORD ev )
 
 void MidiWinMM::updateDeviceList()
 {
+	QMutexLocker locker( &m_devicesMutex );
+
 	closeDevices();
 	openDevices();
 
@@ -244,9 +288,6 @@ void MidiWinMM::updateDeviceList()
 
 void MidiWinMM::closeDevices()
 {
-	m_inputSubs.clear();
-	m_outputSubs.clear();
-
 	QMapIterator<HMIDIIN, QString> i( m_inputDevices );
 
 	HMIDIIN hInDev;
@@ -299,6 +340,22 @@ void MidiWinMM::openDevices()
 		{
 			m_outputDevices[hm] = QString::fromWCharArray(c.szPname);
 		}
+	}
+}
+
+
+
+
+void MidiWinMM::checkForDeviceChanges()
+{
+	const int currentInputCount = midiInGetNumDevs();
+	const int currentOutputCount = midiOutGetNumDevs();
+	
+	if (currentInputCount != m_lastInputDeviceCount || currentOutputCount != m_lastOutputDeviceCount)
+	{
+		m_lastInputDeviceCount = currentInputCount;
+		m_lastOutputDeviceCount = currentOutputCount;
+		updateDeviceList();
 	}
 }
 

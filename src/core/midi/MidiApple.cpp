@@ -27,6 +27,7 @@
 
 #ifdef LMMS_BUILD_APPLE
 
+#include <QMetaObject>
 #include <QtAlgorithms>
 #include <algorithm>
 
@@ -571,6 +572,7 @@ void MidiApple::NotifyCallback( const MIDINotification *message, void *refCon )
 				// Here your code to save the new destination ref
 				// and update your internal "clients"
 			}
+			QMetaObject::invokeMethod( midiApple, "updateDeviceList", Qt::QueuedConnection );
 			break;
 		}
 		case kMIDIMsgObjectRemoved:
@@ -588,7 +590,9 @@ void MidiApple::NotifyCallback( const MIDINotification *message, void *refCon )
 			if (msg->childType == kMIDIObjectType_Destination) {
 				// Here your code to remove the destination ref
 				// and update your internal "clients"
-				qDebug("kMIDIMsgObjectRemoved destination '%s'",fullName);			}
+				qDebug("kMIDIMsgObjectRemoved destination '%s'",fullName);
+			}
+			QMetaObject::invokeMethod( midiApple, "updateDeviceList", Qt::QueuedConnection );
 			break;
 		}
 		case kMIDIMsgPropertyChanged:
