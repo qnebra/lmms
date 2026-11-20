@@ -22,6 +22,8 @@
 
 #include "ReverbSC.h"
 
+#include <QMutexLocker>
+
 #include "embed.h"
 #include "lmms_math.h"
 #include "plugin_export.h"
@@ -75,6 +77,8 @@ ReverbSCEffect::~ReverbSCEffect()
 
 Effect::ProcessStatus ReverbSCEffect::processImpl(SampleFrame* buf, const f_cnt_t frames)
 {
+	QMutexLocker locker(&mutex);
+
 	const float d = dryLevel();
 	const float w = wetLevel();
 
@@ -118,10 +122,10 @@ Effect::ProcessStatus ReverbSCEffect::processImpl(SampleFrame* buf, const f_cnt_
 
 void ReverbSCEffect::changeSampleRate()
 {
+	QMutexLocker locker(&mutex);
+
 	// Change sr variable in Soundpipe. does not need to be destroyed
 	sp->sr = Engine::audioEngine()->outputSampleRate();
-
-	mutex.lock();
 	sp_revsc_destroy(&revsc);
 	sp_dcblock_destroy(&dcblk[0]);
 	sp_dcblock_destroy(&dcblk[1]);
@@ -131,10 +135,8 @@ void ReverbSCEffect::changeSampleRate()
 
 	sp_dcblock_create(&dcblk[0]);
 	sp_dcblock_create(&dcblk[1]);
-
 	sp_dcblock_init(sp, dcblk[0], 1);
 	sp_dcblock_init(sp, dcblk[1], 1);
-	mutex.unlock();
 }
 
 extern "C"

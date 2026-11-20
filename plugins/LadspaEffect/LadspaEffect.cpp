@@ -102,9 +102,13 @@ LadspaEffect::~LadspaEffect()
 void LadspaEffect::changeSampleRate()
 {
 	DataFile dataFile( DataFile::Type::EffectSettings );
-	m_controls->saveState( dataFile, dataFile.content() );
-
 	LadspaControls * controls = m_controls;
+	const bool hadControls = controls != nullptr;
+	if( hadControls )
+	{
+		controls->saveState( dataFile, dataFile.content() );
+	}
+
 	m_controls = nullptr;
 
 	m_pluginMutex.lock();
@@ -112,10 +116,16 @@ void LadspaEffect::changeSampleRate()
 	pluginInstantiation();
 	m_pluginMutex.unlock();
 
-	controls->effectModelChanged( m_controls );
+	if( controls && m_controls )
+	{
+		controls->effectModelChanged( m_controls );
+	}
 	delete controls;
 
-	m_controls->restoreState( dataFile.content().firstChild().toElement() );
+	if( hadControls && m_controls )
+	{
+		m_controls->restoreState( dataFile.content().firstChild().toElement() );
+	}
 
 	// the IDs of re-created controls have been saved and now need to be
 	// resolved again
