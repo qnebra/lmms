@@ -135,7 +135,7 @@ Sf2Instrument::Sf2Instrument( InstrumentTrack * _instrument_track ) :
 	m_resampler(AudioResampler::Mode::Linear),
 	m_synth(nullptr),
 	m_font( nullptr ),
-	m_fontId( 0 ),
+	m_fontId( -1 ),
 	m_filename( "" ),
 	m_lastMidiPitch( -1 ),
 	m_lastMidiPitchRange( -1 ),
@@ -401,6 +401,7 @@ void Sf2Instrument::openFile( const QString & _sf2File, bool updateTrackName )
 
 	// free the soundfont if one is selected
 	freeFont();
+	m_fontId = -1;
 
 	m_synthMutex.lock();
 
@@ -409,7 +410,7 @@ void Sf2Instrument::openFile( const QString & _sf2File, bool updateTrackName )
 	{
 		m_fontId = fluid_synth_sfload(m_synth, filePath.c_str(), true);
 
-		if (fluid_synth_sfcount(m_synth) > 0)
+		if (m_fontId >= 0 && fluid_synth_sfcount(m_synth) > 0)
 		{
 			// Grab this sf from the top of the stack and add to list
 			m_font = fluid_synth_get_sfont(m_synth, 0);
@@ -424,7 +425,7 @@ void Sf2Instrument::openFile( const QString & _sf2File, bool updateTrackName )
 
 	m_synthMutex.unlock();
 
-	if( m_fontId >= 0 )
+	if( loaded )
 	{
 		// Don't reset patch/bank, so that it isn't cleared when
 		// someone resolves a missing file
@@ -448,7 +449,12 @@ void Sf2Instrument::openFile( const QString & _sf2File, bool updateTrackName )
 
 void Sf2Instrument::updatePatch()
 {
-	if( m_bankNum.value() >= 0 && m_patchNum.value() >= 0 )
+	const auto guard = std::lock_guard{m_synthMutex};
+
+	if( m_synth != nullptr &&
+		m_fontId >= 0 &&
+		m_bankNum.value() >= 0 &&
+		m_patchNum.value() >= 0 )
 	{
 		fluid_synth_program_select( m_synth, m_channel, m_fontId,
 				m_bankNum.value(), m_patchNum.value() );
